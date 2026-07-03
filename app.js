@@ -11,7 +11,7 @@ const {
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbwwtxIFj6BaOWinXmPV2BTgdsUdRvqpqtp_0bzoSJv2_C3E2PoHLbKRBj4oH-RPEAUy/exec';
 
-const params = new URLSearchParams(window.location.search);
+const params = new URLSearchParams(window.location.search);on
 const kidId = params.get('kid');
 const isParent = params.get('parent') === 'true';
 
@@ -214,6 +214,7 @@ async function completeQuest(type, choreId) {
     alert("Could not submit quest: " + err.message);
   }
 }
+window.completeQuest = completeQuest;
 
 function showToast(message) {
   const oldToast = document.querySelector('.toast');
