@@ -322,7 +322,6 @@ function showError(message) {
   `;
 }
 function approveQuest(logId) {
-  alert('Approve logId: ' +logId);
   parentAction('approveQuest', logId);
 }
 
