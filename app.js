@@ -18,7 +18,7 @@ function loadKidDashboard(kidId) {
       <header class="hero">
         <div class="logo">⚔️</div>
         <h1>Loading...</h1>
-        <p>Gathering today’s quests...</p>
+        <p>Gathering today's quests...</p>
       </header>
     </main>
   `;
@@ -37,22 +37,16 @@ function loadKidDashboard(kidId) {
   };
 
   const script = document.createElement('script');
+
+  script.onerror = function() {
+    showError('API failed: ' + script.src);
+  };
+
   script.src =
-    console.log(script.src)
     API_URL +
     '?action=kidDashboard' +
     '&kid=' + encodeURIComponent(kidId) +
     '&callback=' + callbackName;
-
-  script.onerror = function() {
-  showError('API failed: ' + script.src);
-};
-
-setTimeout(() => {
-  if (document.querySelector('h1')?.textContent === 'Loading...') {
-    showError('Still waiting on Apps Script API. The callback did not return.');
-  }
-}, 5000);
 
   document.body.appendChild(script);
 }
