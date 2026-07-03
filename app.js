@@ -21,7 +21,7 @@ if (kidId) {
   loadKidDashboard(kidId);
 }
 
-function loadKidDashboard(kidId) {
+async function loadKidDashboard(kidId) {
   document.body.innerHTML = `
     <main class="app">
       <header class="hero">
@@ -32,33 +32,25 @@ function loadKidDashboard(kidId) {
     </main>
   `;
 
-  const callbackName = 'chorequestCallback_' + Date.now();
+  try {
+    const kidSnap = await getDoc(doc(db, "kids", kidId));
 
-  window[callbackName] = function(data) {
-    delete window[callbackName];
-
-    if (data.error) {
-      showError(data.error);
+    if (!kidSnap.exists()) {
+      showError("Kid not found: " + kidId);
       return;
     }
 
-    renderDashboard(data.kid, data.quests || [], data.bonusQuests || []);
-  };
+    const kid = {
+      kidId,
+      ...kidSnap.data()
+    };
 
-  const script = document.createElement('script');
-
-  script.onerror = function() {
-    showError('API failed: ' + script.src);
-  };
-
-  script.src =
-    API_URL +
-    '?action=kidDashboard' +
-    '&kid=' + encodeURIComponent(kidId) +
-    '&callback=' + callbackName;
-
-  document.body.appendChild(script);
+    renderDashboard(kid, [], []);
+  } catch (err) {
+    showError("Firebase error: " + err.message);
+  }
 }
+
 
 function renderDashboard(kid, quests, sideQuests) {
   const xp = Number(kid.xp || 0);
