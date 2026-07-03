@@ -32,8 +32,8 @@ function loadKidDashboard(kidId) {
   };
 
   const script = document.createElement('script');
-  script.src = `${API_URL}?action=completeQuest&kid=${encodeURIComponent(kidId)}&type=${encodeURIComponent(type)}&choreId=${encodeURIComponent(choreId)}&callback=${callbackName}`;
-  document.body.appendChild(script);
+  script.src = `${API_URL}?action=kidDashboard&kid=${encodeURIComponent(kidId)}&callback=${callbackName}`;
+
 }
 
 function renderDashboard(kid, quests, sideQuests) {
@@ -156,17 +156,6 @@ function iconForQuest(name) {
 }
 
 function completeQuest(type, choreId) {
-  const button = event.target;
-  const questEl = button.closest('.quest');
-
-  button.textContent = 'Submitting...';
-  button.classList.add('submitting');
-  button.disabled = true;
-
-  if (questEl) {
-    questEl.classList.add('submitting');
-  }
-
   const callbackName = 'completeQuestCallback_' + Date.now();
 
   window[callbackName] = function(data) {
@@ -174,28 +163,24 @@ function completeQuest(type, choreId) {
 
     if (data.error) {
       alert(data.error);
-      loadKidDashboard(kidId);
       return;
     }
 
-    button.textContent = 'Submitted!';
-    showtoast('Quest submitted for approval');
-    button.classList.remove('submitting');
-    button.classList.add('submitted');
-
-    if (questEl) {
-      questEl.classList.remove('submitting');
-      questEl.classList.add('submitted');
-    }
+    showToast('Quest submitted for approval!');
 
     setTimeout(() => {
       loadKidDashboard(kidId);
-    }, 650);
+    }, 700);
   };
 
   const script = document.createElement('script');
   script.src =
-    `${API_URL}?action=completeQuest&kid=${encodeURIComponent(kidId)}&choreId=${encodeURIComponent(choreId)}&callback=${callbackName}`;
+    API_URL +
+    '?action=completeQuest' +
+    '&kid=' + encodeURIComponent(kidId) +
+    '&type=' + encodeURIComponent(type) +
+    '&choreId=' + encodeURIComponent(choreId) +
+    '&callback=' + callbackName;
 
   document.body.appendChild(script);
 }
