@@ -355,10 +355,6 @@ function parentAction(action, logId) {
   document.body.appendChild(script);
 }
 
-function approveQuest(logId) {
-  parentAction('approveQuest', logId);
-}
-
 function getCompletionMessage() {
   const kidName = document.querySelector('h1')?.textContent || '';
 
