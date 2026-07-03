@@ -297,8 +297,8 @@ function renderParentDashboard(data) {
                 </div>
 
                 <div class="parent-buttons">
-                  <button onclick="approveQuest('${item.logId}')">✅</button>
-                  <button onclick="rejectQuest('${item.logId}')">❌</button>
+                  <button onclick="approveQuest(&quot;${item.logId}&quot;)">✅</button>
+                  <button onclick="rejectQuest(&quot;${item.logId}&quot;)">❌</button>
                 </div>
               </div>
             `).join('')
