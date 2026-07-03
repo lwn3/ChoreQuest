@@ -142,15 +142,3 @@ function completeQuest(type, choreId) {
 
   document.body.appendChild(script);
 }
-
-function showError(message) {
-  document.body.innerHTML = `
-    <main class="app">
-      <section class="card">
-        <h2>Something went wrong</h2>
-        <p>${message}</p>
-        <a href="./">Back</a>
-      </section>
-    </main>
-  `;
-}
