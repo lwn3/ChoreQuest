@@ -45,8 +45,29 @@ async function loadKidDashboard(kidId) {
       kidId,
       ...kidSnap.data()
     };
-console.log(kid);
-    renderDashboard(kid, [], []);
+console.log(kid);const questSnap = await getDocs(collection(db, "quests"));
+
+const quests = [];
+const sideQuests = [];
+
+questSnap.forEach(docSnap => {
+  const quest = {
+    choreId: docSnap.id,
+    ...docSnap.data()
+  };
+
+  if (!quest.active) return;
+  if (quest.kidId !== kidId) return;
+
+  if (quest.type === "bonus") {
+    sideQuests.push(quest);
+  } else {
+    quests.push(quest);
+  }
+});
+
+renderDashboard(kid, quests, sideQuests);
+
   } catch (err) {
     showError("Firebase error: " + err.message);
   }
