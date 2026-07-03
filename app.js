@@ -145,7 +145,7 @@ function questCard(quest) {
 
       <div class="quest-info">
         <strong>${quest.name}</strong>
-        <span>${quest.time} • +${quest.xp} Gold</span>
+        <span>${quest.time} • +${quest.gold} Gold</span>
         <small class="status ${statusClass(quest.status)}">${statusLabel(quest.status)}</small>
       </div>
 
