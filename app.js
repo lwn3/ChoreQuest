@@ -11,7 +11,7 @@ const {
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbwwtxIFj6BaOWinXmPV2BTgdsUdRvqpqtp_0bzoSJv2_C3E2PoHLbKRBj4oH-RPEAUy/exec';
 
-const params = new URLSearchParams(window.location.search);on
+const params = new URLSearchParams(window.location.search);
 const kidId = params.get('kid');
 const isParent = params.get('parent') === 'true';
 
