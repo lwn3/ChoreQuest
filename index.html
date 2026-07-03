@@ -1,11 +1,41 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8">
-    <title>ChoreQuest</title>
-  </head>
-  <body>
-    <h1>ChoreQuest</h1>
-    <p>The app is alive.</p>
-  </body>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChoreQuest</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div class="logo">⚔️</div>
+      <h1>ChoreQuest</h1>
+      <p>Complete quests. Earn XP. Unlock rewards.</p>
+    </header>
+
+    <section class="card">
+      <h2>Choose Your Character</h2>
+
+      <a class="character" href="?kid=K001">
+        <div class="avatar">🐺</div>
+        <div>
+          <strong>Cammron</strong>
+          <span>Animal Care Adventurer</span>
+        </div>
+      </a>
+
+      <a class="character" href="?kid=K002">
+        <div class="avatar">🦊</div>
+        <div>
+          <strong>Autumn</strong>
+          <span>Household Quest Ranger</span>
+        </div>
+      </a>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
 </html>
