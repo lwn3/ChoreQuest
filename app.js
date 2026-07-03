@@ -52,7 +52,6 @@ async function loadKidDashboard(kidId) {
   }
 }
 
-
 function renderDashboard(kid, quests, sideQuests) {
   const xp = Number(kid.xp || 0);
   const gold = Number(kid.gold || 0);
