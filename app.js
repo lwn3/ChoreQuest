@@ -336,14 +336,19 @@ function parentAction(action, logId) {
     delete window[callbackName];
 
     if (data.error) {
-      alert(data.error);
+      alert('Error: ' + data.error);
       return;
     }
 
+    alert('Success!');
     loadParentDashboard();
   };
 
   const script = document.createElement('script');
+
+  script.onerror = function() {
+    alert('API call failed to load.');
+  };
 
   script.src =
     API_URL +
@@ -353,6 +358,7 @@ function parentAction(action, logId) {
 
   document.body.appendChild(script);
 }
+
 function approveQuest(logId) {
   parentAction('approveQuest', logId);
 }
