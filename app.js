@@ -123,7 +123,24 @@ function iconForQuest(name) {
 }
 
 function completeQuest(type, choreId) {
-  alert(`Live submission is next. Type: ${type}, Chore ID: ${choreId}`);
+  const callbackName = 'completeQuestCallback_' + Date.now();
+
+  window[callbackName] = function(data) {
+    delete window[callbackName];
+
+    if (data.error) {
+      alert(data.error);
+      return;
+    }
+
+    loadKidDashboard(kidId);
+  };
+
+  const script = document.createElement('script');
+  script.src =
+    `${API_URL}?action=completeQuest&kid=${encodeURIComponent(kidId)}&choreId=${encodeURIComponent(choreId)}&callback=${callbackName}`;
+
+  document.body.appendChild(script);
 }
 
 function showError(message) {
