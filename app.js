@@ -28,7 +28,7 @@ function loadKidDashboard(kidId) {
       return;
     }
 
-    renderDashboard(data.kid, data.quests);
+    renderDashboard(data.kid, data.quests || [], data.bonusQuests || []);
   };
 
   const script = document.createElement('script');
@@ -36,7 +36,7 @@ function loadKidDashboard(kidId) {
   document.body.appendChild(script);
 }
 
-function renderDashboard(kid, quests) {
+function renderDashboard(kid, quests, bonusQuests) {
   document.body.innerHTML = `
     <main class="app">
       <header class="hero">
@@ -60,8 +60,17 @@ function renderDashboard(kid, quests) {
         <h2>Today's Quests</h2>
         ${
           quests.length === 0
-            ? '<p>No quests available right now.</p>'
+            ? '<p>No daily quests available right now.</p>'
             : quests.map(questCard).join('')
+        }
+      </section>
+
+      <section class="card bonus-card">
+        <h2>Bonus Quests</h2>
+        ${
+          bonusQuests.length === 0
+            ? '<p>No bonus quests available right now.</p>'
+            : bonusQuests.map(questCard).join('')
         }
       </section>
 
@@ -85,8 +94,8 @@ function questCard(quest) {
 }
 
 function buttonForQuest(quest) {
-  if (quest.status === 'Not Started') {
-    return `<button onclick="completeQuest('${quest.choreId}')">Complete</button>`;
+  if (quest.status === 'Not Started' || quest.status === 'Available') {
+    return `<button onclick="completeQuest('${quest.type}', '${quest.choreId}')">Complete</button>`;
   }
 
   if (quest.status === 'Pending') {
@@ -107,12 +116,14 @@ function iconForQuest(name) {
   if (lower.includes('cat')) return '🐈';
   if (lower.includes('dish')) return '🍽️';
   if (lower.includes('litter')) return '🧹';
+  if (lower.includes('garbage') || lower.includes('trash')) return '🗑️';
+  if (lower.includes('vacuum')) return '🧽';
 
   return '📜';
 }
 
-function completeQuest(choreId) {
-  alert('Live quest submission is next. This button is reading the real chore ID: ' + choreId);
+function completeQuest(type, choreId) {
+  alert(`Live submission is next. Type: ${type}, Chore ID: ${choreId}`);
 }
 
 function showError(message) {
