@@ -152,6 +152,17 @@ function iconForQuest(name) {
 }
 
 function completeQuest(type, choreId) {
+  const button = event.target;
+  const questEl = button.closest('.quest');
+
+  button.textContent = 'Submitting...';
+  button.classList.add('submitting');
+  button.disabled = true;
+
+  if (questEl) {
+    questEl.classList.add('submitting');
+  }
+
   const callbackName = 'completeQuestCallback_' + Date.now();
 
   window[callbackName] = function(data) {
@@ -159,10 +170,22 @@ function completeQuest(type, choreId) {
 
     if (data.error) {
       alert(data.error);
+      loadKidDashboard(kidId);
       return;
     }
 
-    loadKidDashboard(kidId);
+    button.textContent = 'Submitted!';
+    button.classList.remove('submitting');
+    button.classList.add('submitted');
+
+    if (questEl) {
+      questEl.classList.remove('submitting');
+      questEl.classList.add('submitted');
+    }
+
+    setTimeout(() => {
+      loadKidDashboard(kidId);
+    }, 650);
   };
 
   const script = document.createElement('script');
@@ -171,6 +194,7 @@ function completeQuest(type, choreId) {
 
   document.body.appendChild(script);
 }
+
 
 function showError(message) {
   document.body.innerHTML = `
