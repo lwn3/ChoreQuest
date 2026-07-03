@@ -13,7 +13,7 @@ function loadKidDashboard(kidId) {
       <header class="hero">
         <div class="logo">⚔️</div>
         <h1>Loading...</h1>
-        <p>Gathering today's quests...</p>
+        <p>Gathering today’s quests...</p>
       </header>
     </main>
   `;
@@ -36,28 +36,41 @@ function loadKidDashboard(kidId) {
   document.body.appendChild(script);
 }
 
-function renderDashboard(kid, quests, bonusQuests) {
+function renderDashboard(kid, quests, sideQuests) {
+  const xp = Number(kid.xp || 0);
+  const level = Math.max(1, Number(kid.level || 1));
+  const xpNeeded = 100;
+  const xpIntoLevel = xp % xpNeeded;
+  const progressPercent = Math.min(100, Math.round((xpIntoLevel / xpNeeded) * 100));
+
   document.body.innerHTML = `
     <main class="app">
-      <header class="hero">
+      <header class="hero compact">
         <div class="logo">${kid.avatar}</div>
         <h1>${kid.name}</h1>
         <p>${kid.title}</p>
       </header>
 
-      <section class="card stats">
-        <div>
-          <strong>Level ${kid.level}</strong>
-          <span>Current Level</span>
+      <section class="card character-card">
+        <div class="level-row">
+          <div>
+            <span class="label">Level</span>
+            <strong>${level}</strong>
+          </div>
+          <div>
+            <span class="label">Gold</span>
+            <strong>${xp}</strong>
+          </div>
         </div>
-        <div>
-          <strong>${kid.xp} XP</strong>
-          <span>Total XP</span>
+
+        <div class="xp-bar">
+          <div class="xp-fill" style="width:${progressPercent}%"></div>
         </div>
+        <p class="xp-text">${xpIntoLevel} / ${xpNeeded} XP to next level</p>
       </section>
 
       <section class="card">
-        <h2>Today's Quests</h2>
+        <h2>⚔️ Daily Quests</h2>
         ${
           quests.length === 0
             ? '<p>No daily quests available right now.</p>'
@@ -65,12 +78,12 @@ function renderDashboard(kid, quests, bonusQuests) {
         }
       </section>
 
-      <section class="card bonus-card">
-        <h2>Bonus Quests</h2>
+      <section class="card side-card">
+        <h2>🗺 Side Quests</h2>
         ${
-          bonusQuests.length === 0
-            ? '<p>No bonus quests available right now.</p>'
-            : bonusQuests.map(questCard).join('')
+          sideQuests.length === 0
+            ? '<p>No side quests available right now.</p>'
+            : sideQuests.map(questCard).join('')
         }
       </section>
 
@@ -83,11 +96,13 @@ function questCard(quest) {
   return `
     <div class="quest">
       <div class="quest-icon">${iconForQuest(quest.name)}</div>
+
       <div class="quest-info">
         <strong>${quest.name}</strong>
-        <span>${quest.time} • +${quest.xp} XP</span>
-        <small>Status: ${quest.status}</small>
+        <span>${quest.time} • +${quest.xp} Gold</span>
+        <small class="status ${statusClass(quest.status)}">${statusLabel(quest.status)}</small>
       </div>
+
       ${buttonForQuest(quest)}
     </div>
   `;
@@ -99,14 +114,28 @@ function buttonForQuest(quest) {
   }
 
   if (quest.status === 'Pending') {
-    return `<button disabled>Pending</button>`;
+    return `<button class="disabled" disabled>Pending</button>`;
   }
 
   if (quest.status === 'Approved') {
-    return `<button disabled>Approved</button>`;
+    return `<button class="approved" disabled>Done</button>`;
   }
 
-  return `<button disabled>${quest.status}</button>`;
+  return `<button class="disabled" disabled>${quest.status}</button>`;
+}
+
+function statusLabel(status) {
+  if (status === 'Not Started') return 'Ready';
+  if (status === 'Available') return 'Available';
+  if (status === 'Pending') return 'Awaiting approval';
+  if (status === 'Approved') return 'Completed';
+  return status;
+}
+
+function statusClass(status) {
+  if (status === 'Pending') return 'status-pending';
+  if (status === 'Approved') return 'status-approved';
+  return 'status-ready';
 }
 
 function iconForQuest(name) {
@@ -141,4 +170,16 @@ function completeQuest(type, choreId) {
     `${API_URL}?action=completeQuest&kid=${encodeURIComponent(kidId)}&choreId=${encodeURIComponent(choreId)}&callback=${callbackName}`;
 
   document.body.appendChild(script);
+}
+
+function showError(message) {
+  document.body.innerHTML = `
+    <main class="app">
+      <section class="card">
+        <h2>Something went wrong</h2>
+        <p>${message}</p>
+        <a href="./">Back</a>
+      </section>
+    </main>
+  `;
 }
