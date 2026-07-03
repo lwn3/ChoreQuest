@@ -61,6 +61,11 @@ function renderDashboard(kid, quests, sideQuests) {
             <span class="label">Gold</span>
             <strong>${xp}</strong>
           </div>
+          <div>
+  <span class="label">Streak</span>
+  <strong>0🔥</strong>
+</div>
+
         </div>
 
         <div class="xp-bar">
