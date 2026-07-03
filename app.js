@@ -32,13 +32,21 @@ function loadKidDashboard(kidId) {
   };
 
   const script = document.createElement('script');
-  script.src = `${API_URL}?action=kidDashboard&kid=${encodeURIComponent(kidId)}&callback=${callbackName}`;
+  script.src =
+    API_URL +
+    '?action=kidDashboard' +
+    '&kid=' + encodeURIComponent(kidId) +
+    '&callback=' + callbackName;
 
+  document.body.appendChild(script);
 }
 
 function renderDashboard(kid, quests, sideQuests) {
   const xp = Number(kid.xp || 0);
+  const gold = Number(kid.gold || 0);
+  const streak = Number(kid.currentStreak || 0);
   const level = Math.max(1, Number(kid.level || 1));
+
   const xpNeeded = 100;
   const xpIntoLevel = xp % xpNeeded;
   const progressPercent = Math.min(100, Math.round((xpIntoLevel / xpNeeded) * 100));
@@ -59,17 +67,18 @@ function renderDashboard(kid, quests, sideQuests) {
           </div>
           <div>
             <span class="label">Gold</span>
-            <strong>${xp}</strong>
+            <strong>${gold}</strong>
           </div>
           <div>
             <span class="label">Streak</span>
-            <strong>0🔥</strong>
+            <strong>${streak}🔥</strong>
           </div>
         </div>
 
         <div class="xp-bar">
           <div class="xp-fill" style="width:${progressPercent}%"></div>
         </div>
+
         <p class="xp-text">${xpIntoLevel} / ${xpNeeded} XP to next level</p>
       </section>
 
