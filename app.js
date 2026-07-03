@@ -2,6 +2,11 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbwwtxIFj6BaOWinXmPV2BTg
 
 const params = new URLSearchParams(window.location.search);
 const kidId = params.get('kid');
+const isParent = params.get('parent') === 'true';
+
+if (isParent) {
+  loadParentDashboard();
+}
 
 if (kidId) {
   loadKidDashboard(kidId);
@@ -217,6 +222,85 @@ function showToast(message) {
   setTimeout(() => {
     toast.remove();
   }, 1800);
+}
+
+function loadParentDashboard() {
+  document.body.innerHTML = `
+    <main class="app">
+      <header class="hero">
+        <div class="logo">🛡️</div>
+        <h1>Guild Hall</h1>
+        <p>Parent Dashboard</p>
+      </header>
+    </main>
+  `;
+
+  const callbackName = 'parentDashboardCallback_' + Date.now();
+
+  window[callbackName] = function(data) {
+    delete window[callbackName];
+
+    if (data.error) {
+      showError(data.error);
+      return;
+    }
+
+    renderParentDashboard(data);
+  };
+
+  const script = document.createElement('script');
+  script.src =
+    API_URL +
+    '?action=parentDashboard' +
+    '&callback=' + callbackName;
+
+  document.body.appendChild(script);
+}
+
+function renderParentDashboard(data) {
+  document.body.innerHTML = `
+    <main class="app">
+      <header class="hero compact">
+        <div class="logo">🛡️</div>
+        <h1>Guild Hall</h1>
+        <p>Quest Review & Family Progress</p>
+      </header>
+
+      <section class="card">
+        <h2>Adventurers</h2>
+        ${data.kids.map(kid => `
+          <div class="quest">
+            <div class="quest-icon">${kid.kidId === 'K001' ? '🐺' : '🦊'}</div>
+            <div class="quest-info">
+              <strong>${kid.name}</strong>
+              <span>Level ${kid.level} • ${kid.gold} Gold • ${kid.currentStreak}🔥</span>
+              <small class="status status-ready">${kid.lifetimeQuests} lifetime quests</small>
+            </div>
+          </div>
+        `).join('')}
+      </section>
+
+      <section class="card">
+        <h2>Quest Review</h2>
+        ${
+          data.pending.length === 0
+            ? '<p>No quests pending approval.</p>'
+            : data.pending.map(item => `
+              <div class="quest">
+                <div class="quest-icon">📜</div>
+                <div class="quest-info">
+                  <strong>${item.choreName}</strong>
+                  <span>Assigned: ${item.assignedKid}</span>
+                  <small class="status status-pending">Completed by ${item.completedBy}</small>
+                </div>
+              </div>
+            `).join('')
+        }
+      </section>
+
+      <a class="back-link" href="./">← Back to Home</a>
+    </main>
+  `;
 }
 
 function showError(message) {
