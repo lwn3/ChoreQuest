@@ -85,6 +85,11 @@ function renderDashboard(kid, quests, sideQuests) {
   const progressPercent = Math.min(100, Math.round((xpIntoLevel / xpNeeded) * 100));
 
   document.body.innerHTML = `
+    document.querySelectorAll('.complete-btn').forEach(button => {
+  button.addEventListener('click', () => {
+    completeQuest(button.dataset.type, button.dataset.choreId);
+  });
+});
     <main class="app">
       <header class="hero compact">
         <div class="logo">${kid.avatar}</div>
@@ -157,7 +162,7 @@ function questCard(quest) {
 
 function buttonForQuest(quest) {
   if (quest.status === 'Ready' || quest.status === 'Not Started' || quest.status === 'Available') {
-    return `<button onclick="completeQuest('${quest.type}', '${quest.choreId}')">Complete</button>`;
+    return `<button class="complete-btn" data-type="${quest.type}" data-chore-id="${quest.choreId}">Complete</button>`;
   }
 
   if (quest.status === 'Pending') {
