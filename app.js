@@ -38,13 +38,14 @@ function loadKidDashboard(kidId) {
 
   const script = document.createElement('script');
   script.src =
+    console.log(script.src)
     API_URL +
     '?action=kidDashboard' +
     '&kid=' + encodeURIComponent(kidId) +
     '&callback=' + callbackName;
 
   script.onerror = function() {
-  showError('Could not load data from Apps Script API.');
+  showError('API failed: ' + script.src);
 };
 
 setTimeout(() => {
