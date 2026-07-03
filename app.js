@@ -32,7 +32,7 @@ function loadKidDashboard(kidId) {
   };
 
   const script = document.createElement('script');
-  script.src = `${API_URL}?action=kidDashboard&kid=${encodeURIComponent(kidId)}&callback=${callbackName}`;
+  script.src = `${API_URL}?action=completeQuest&kid=${encodeURIComponent(kidId)}&type=${encodeURIComponent(type)}&choreId=${encodeURIComponent(choreId)}&callback=${callbackName}`;
   document.body.appendChild(script);
 }
 
