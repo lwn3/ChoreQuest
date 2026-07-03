@@ -1,3 +1,12 @@
+import "./firebase.js";
+const {
+  db,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+} = window.ChoreQuestFirebase;
+
 const API_URL = 'https://script.google.com/macros/s/AKfycbwwtxIFj6BaOWinXmPV2BTgdsUdRvqpqtp_0bzoSJv2_C3E2PoHLbKRBj4oH-RPEAUy/exec';
 
 const params = new URLSearchParams(window.location.search);
