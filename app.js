@@ -6,6 +6,7 @@ const {
   doc,
   getDoc,
   getDocs,
+  updateDoc
 } = window.ChoreQuestFirebase;
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbwwtxIFj6BaOWinXmPV2BTgdsUdRvqpqtp_0bzoSJv2_C3E2PoHLbKRBj4oH-RPEAUy/exec';
@@ -197,34 +198,21 @@ function iconForQuest(name) {
   return '📜';
 }
 
-function completeQuest(type, choreId) {
-  const callbackName = 'completeQuestCallback_' + Date.now();
-
-  window[callbackName] = function(data) {
-    delete window[callbackName];
-
-    if (data.error) {
-      alert(data.error);
-      return;
-    }
+async function completeQuest(type, choreId) {
+  try {
+    await updateDoc(doc(db, "quests", choreId), {
+      status: "Pending",
+      completedBy: kidId
+    });
 
     showToast(getCompletionMessage());
 
     setTimeout(() => {
       loadKidDashboard(kidId);
     }, 700);
-  };
-
-  const script = document.createElement('script');
-  script.src =
-    API_URL +
-    '?action=completeQuest' +
-    '&kid=' + encodeURIComponent(kidId) +
-    '&type=' + encodeURIComponent(type) +
-    '&choreId=' + encodeURIComponent(choreId) +
-    '&callback=' + callbackName;
-
-  document.body.appendChild(script);
+  } catch (err) {
+    alert("Could not submit quest: " + err.message);
+  }
 }
 
 function showToast(message) {
