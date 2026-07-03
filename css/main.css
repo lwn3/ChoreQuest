@@ -50,6 +50,15 @@ h2 {
   background: linear-gradient(135deg, #fef3c7, #fde68a);
 }
 
+.class-path {
+  display: block;
+  margin-top: 4px;
+  color: #cbd5e1;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .level-row {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
