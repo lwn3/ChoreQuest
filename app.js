@@ -67,7 +67,7 @@ function renderDashboard(kid, quests, sideQuests) {
       <header class="hero compact">
         <div class="logo">${kid.avatar}</div>
         <h1>${kid.name}</h1>
-        <p>${kid.title}</p>
+        <p>${kid.classTitle}</p>
         <small class="class-path">${kid.classPath}</small>
       </header>
 
