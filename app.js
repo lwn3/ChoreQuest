@@ -85,11 +85,7 @@ function renderDashboard(kid, quests, sideQuests) {
   const progressPercent = Math.min(100, Math.round((xpIntoLevel / xpNeeded) * 100));
 
   document.body.innerHTML = `
-    document.querySelectorAll('.complete-btn').forEach(button => {
-  button.addEventListener('click', () => {
-    completeQuest(button.dataset.type, button.dataset.choreId);
-  });
-});
+    
     <main class="app">
       <header class="hero compact">
         <div class="logo">${kid.avatar}</div>
@@ -142,6 +138,11 @@ function renderDashboard(kid, quests, sideQuests) {
       <a class="back-link" href="./">← Switch Character</a>
     </main>
   `;
+  document.querySelectorAll('.complete-btn').forEach(button => {
+  button.addEventListener('click', () => {
+    completeQuest(button.dataset.type, button.dataset.choreId);
+  });
+});
 }
 
 function questCard(quest) {
