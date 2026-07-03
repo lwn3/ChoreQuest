@@ -45,7 +45,7 @@ async function loadKidDashboard(kidId) {
       kidId,
       ...kidSnap.data()
     };
-
+console.log(kid);
     renderDashboard(kid, [], []);
   } catch (err) {
     showError("Firebase error: " + err.message);
