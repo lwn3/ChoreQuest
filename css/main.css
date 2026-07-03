@@ -205,3 +205,22 @@ button.approved {
   margin: 18px 0;
   text-decoration: none;
 }
+.quest.submitting {
+  opacity: 0.7;
+  transform: scale(0.98);
+}
+
+.quest.submitted {
+  background: #ecfdf5;
+  border-radius: 14px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+button.submitting {
+  background: #6b7280;
+}
+
+button.submitted {
+  background: #16a34a;
+}
