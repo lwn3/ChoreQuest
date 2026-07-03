@@ -191,7 +191,7 @@ function completeQuest(type, choreId) {
       return;
     }
 
-    showToast('Quest submitted for approval!');
+    showToast(getCompletionMessage());
 
     setTimeout(() => {
       loadKidDashboard(kidId);
@@ -362,3 +362,18 @@ function parentAction(action, logId) {
 function approveQuest(logId) {
   parentAction('approveQuest', logId);
 }
+
+function getCompletionMessage() {
+  const kidName = document.querySelector('h1')?.textContent || '';
+
+  if (kidName === 'Autumn') {
+    return '✨ Quest submitted with sparkles!';
+  }
+
+  if (kidName === 'Cammron') {
+    return '🥊 Quest punched into review!';
+  }
+
+  return 'Quest submitted for approval!';
+}
+
