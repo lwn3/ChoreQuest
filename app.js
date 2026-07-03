@@ -340,7 +340,7 @@ function parentAction(action, logId) {
       return;
     }
 
-    alert('Success!');
+    
     loadParentDashboard();
   };
 
