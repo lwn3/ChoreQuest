@@ -354,6 +354,5 @@ function parentAction(action, logId) {
   document.body.appendChild(script);
 }
 function approveQuest(logId) {
-  alert('Approve logId: ' + logId);
   parentAction('approveQuest', logId);
 }
