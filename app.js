@@ -271,22 +271,13 @@ function renderParentDashboard(data) {
         <h2>Adventurers</h2>
         ${data.kids.map(kid => `
           <div class="quest">
-  <div class="quest-icon">📜</div>
-
-  <div class="quest-info">
-    <strong>${item.choreName}</strong>
-    <span>Assigned: ${item.assignedKid}</span>
-    <small class="status status-pending">
-      Completed by ${item.completedBy}
-    </small>
-  </div>
-
-  <div class="parent-buttons">
-    <button onclick="approveQuest('${item.logId}')">✅</button>
-    <button onclick="rejectQuest('${item.logId}')">❌</button>
-  </div>
-</div>
-
+            <div class="quest-icon">${kid.kidId === 'K001' ? '🐺' : '🦊'}</div>
+            <div class="quest-info">
+              <strong>${kid.name}</strong>
+              <span>Level ${kid.level} • ${kid.gold} Gold • ${kid.currentStreak}🔥</span>
+              <small class="status status-ready">${kid.lifetimeQuests} lifetime quests</small>
+            </div>
+          </div>
         `).join('')}
       </section>
 
@@ -298,10 +289,16 @@ function renderParentDashboard(data) {
             : data.pending.map(item => `
               <div class="quest">
                 <div class="quest-icon">📜</div>
+
                 <div class="quest-info">
                   <strong>${item.choreName}</strong>
                   <span>Assigned: ${item.assignedKid}</span>
                   <small class="status status-pending">Completed by ${item.completedBy}</small>
+                </div>
+
+                <div class="parent-buttons">
+                  <button onclick="approveQuest('${item.logId}')">✅</button>
+                  <button onclick="rejectQuest('${item.logId}')">❌</button>
                 </div>
               </div>
             `).join('')
