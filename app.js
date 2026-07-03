@@ -179,6 +179,7 @@ function completeQuest(type, choreId) {
     }
 
     button.textContent = 'Submitted!';
+    showtoast('Quest submitted for approval');
     button.classList.remove('submitting');
     button.classList.add('submitted');
 
@@ -199,6 +200,20 @@ function completeQuest(type, choreId) {
   document.body.appendChild(script);
 }
 
+function showToast(message) {
+  const oldToast = document.querySelector('.toast');
+  if (oldToast) oldToast.remove();
+
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = message;
+
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.remove();
+  }, 1800);
+}
 
 function showError(message) {
   document.body.innerHTML = `
