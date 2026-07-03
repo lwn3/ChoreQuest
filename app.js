@@ -38,6 +38,16 @@ function loadKidDashboard(kidId) {
     '&kid=' + encodeURIComponent(kidId) +
     '&callback=' + callbackName;
 
+  script.onerror = function() {
+  showError('Could not load data from Apps Script API.');
+};
+
+setTimeout(() => {
+  if (document.querySelector('h1')?.textContent === 'Loading...') {
+    showError('Still waiting on Apps Script API. The callback did not return.');
+  }
+}, 5000);
+
   document.body.appendChild(script);
 }
 
