@@ -155,7 +155,7 @@ function questCard(quest) {
 }
 
 function buttonForQuest(quest) {
-  if (quest.status === 'Not Started' || quest.status === 'Available') {
+  if (quest.status === 'Ready' || quest.status === 'Not Started' || quest.status === 'Available') {
     return `<button onclick="completeQuest('${quest.type}', '${quest.choreId}')">Complete</button>`;
   }
 
