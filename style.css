@@ -229,3 +229,40 @@ button.approved {
   align-items: center;
   gap: 10px;
 }
+.card.form,
+.card.form-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card.form label,
+.card.form-card label {
+  display: block;
+  font-weight: 700;
+}
+
+.card.form input,
+.card.form select,
+.card.form-card input,
+.card.form-card select {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  font-size: 16px;
+}
+
+.card.form .checkbox-row,
+.card.form-card .checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card.form .checkbox-row input,
+.card.form-card .checkbox-row input {
+  width: auto;
+}
