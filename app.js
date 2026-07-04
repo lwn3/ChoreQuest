@@ -1,4 +1,4 @@
-imprt "./firebase.js";
+import "./firebase.js";
 
 const {
   db,
