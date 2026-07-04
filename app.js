@@ -27,7 +27,7 @@ async function loadKidDashboard(kidId) {
   document.body.innerHTML = `
     <main class="app">
       <header class="hero">
-        <div class="logo">⚔️</div>
+        <div class="logo">⚔️<div>
         <h1>Loading...</h1>
         <p>Gathering today's quests...</p>
       </header>
@@ -47,7 +47,7 @@ async function loadKidDashboard(kidId) {
       ...kidSnap.data()
     };
 console.log(kid);const questSnap = await getDocs(collection(db, "quests"));
-
+await resetDailyQuestsIfNeeded();
 const quests = [];
 const sideQuests = [];
 
@@ -143,6 +143,34 @@ function renderDashboard(kid, quests, sideQuests) {
     completeQuest(button.dataset.type, button.dataset.choreId);
   });
 });
+}
+
+function getTodayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function resetDailyQuestsIfNeeded() {
+  const today = getTodayKey();
+  const questSnap = await getDocs(collection(db, "quests"));
+
+  const resets = [];
+
+  questSnap.forEach(docSnap => {
+    const quest = docSnap.data();
+
+    if (quest.type !== "daily") return;
+    if (quest.lastResetDate === today) return;
+
+    resets.push(
+      updateDoc(doc(db, "quests", docSnap.id), {
+        status: "Ready",
+        completedBy: "",
+        lastResetDate: today
+      })
+    );
+  });
+
+  await Promise.all(resets);
 }
 
 function questCard(quest) {
@@ -264,7 +292,7 @@ async function loadParentDashboard() {
     kids.forEach(kid => {
       kidNames[kid.kidId] = kid.name;
     });
-
+await resetDailyQuestsIfNeeded();
     const pending = [];
     questSnap.forEach(docSnap => {
       const quest = {
