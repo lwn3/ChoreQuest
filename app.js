@@ -1,4 +1,5 @@
 import "./firebase.js";
+const isManager = params.get('manager') === 'true';
 
 const {
   db,
@@ -15,9 +16,12 @@ const params = new URLSearchParams(window.location.search);
 const kidId = params.get('kid');
 const isParent = params.get('parent') === 'true';
 
-if (isParent) {
+if (isParent && isManager) {
+  loadQuestManager();
+} else if (isParent) {
   loadParentDashboard();
 }
+
 
 if (kidId) {
   loadKidDashboard(kidId);
@@ -367,6 +371,13 @@ function renderParentDashboard(data) {
             `).join('')
         }
       </section>
+<a class="character parent-link" href="?parent=true&manager=true">
+  <div class="avatar">📋</div>
+  <div>
+    <strong>Quest Manager</strong>
+    <span>View and manage quests</span>
+  </div>
+</a>
 
       <a class="back-link" href="./">← Back to Home</a>
     </main>
@@ -483,3 +494,65 @@ function getCompletionMessage() {
   return 'Quest submitted for approval!';
 }
 
+async function loadQuestManager() {
+  document.body.innerHTML = `
+    <main class="app">
+      <header class="hero compact">
+        <div class="logo">📋</div>
+        <h1>Quest Manager</h1>
+        <p>Manage Daily and Side Quests</p>
+      </header>
+
+      <section class="card">
+        <p>Loading quests...</p>
+      </section>
+    </main>
+  `;
+
+  try {
+    const kidsSnap = await getDocs(collection(db, "kids"));
+    const questSnap = await getDocs(collection(db, "quests"));
+
+    const kidNames = {};
+    kidsSnap.forEach(docSnap => {
+      kidNames[docSnap.id] = docSnap.data().name;
+    });
+
+    const quests = [];
+    questSnap.forEach(docSnap => {
+      quests.push({
+        questId: docSnap.id,
+        ...docSnap.data()
+      });
+    });
+
+    document.body.innerHTML = `
+      <main class="app">
+        <header class="hero compact">
+          <div class="logo">📋</div>
+          <h1>Quest Manager</h1>
+          <p>${quests.length} quests</p>
+        </header>
+
+        <section class="card">
+          ${quests.map(quest => `
+            <div class="quest">
+              <div class="quest-icon">${quest.type === 'daily' ? '⚔️' : '🗺️'}</div>
+              <div class="quest-info">
+                <strong>${quest.name}</strong>
+                <span>${quest.type === 'daily' ? 'Daily Quest' : 'Side Quest'} • ${quest.time || 'Anytime'}</span>
+                <small class="status status-ready">
+                  ${kidNames[quest.kidId] || quest.kidId} • +${quest.xp || 0} XP • +${quest.gold || 0} Gold
+                </small>
+              </div>
+            </div>
+          `).join('')}
+        </section>
+
+        <a class="back-link" href="?parent=true">← Back to Guild Hall</a>
+      </main>
+    `;
+  } catch (err) {
+    showError("Quest manager error: " + err.message);
+  }
+}
