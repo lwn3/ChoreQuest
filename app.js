@@ -382,11 +382,22 @@ async function approveQuest(logId) {
       approvedAt: new Date().toISOString()
     });
 
-    await updateDoc(kidRef, {
-      xp: Number(kid.xp || 0) + Number(quest.xp || 0),
-      gold: Number(kid.gold || 0) + Number(quest.gold || 0),
-      lifetimeQuests: Number(kid.lifetimeQuests || 0) + 1
-    });
+    const oldLevel = Number(kid.level || 1);
+const newXp = Number(kid.xp || 0) + Number(quest.xp || 0);
+const newGold = Number(kid.gold || 0) + Number(quest.gold || 0);
+const newLevel = Math.floor(newXp / 100) + 1;
+
+await updateDoc(kidRef, {
+  xp: newXp,
+  gold: newGold,
+  level: newLevel,
+  lifetimeQuests: Number(kid.lifetimeQuests || 0) + 1
+});
+
+if (newLevel > oldLevel) {
+  alert(`${kid.name} leveled up to Level ${newLevel}! 🎉`);
+}
+
 
     loadParentDashboard();
   } catch (err) {
