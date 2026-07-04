@@ -542,8 +542,13 @@ async function loadQuestManager() {
                 <strong>${quest.name}</strong>
                 <span>${quest.type === 'daily' ? 'Daily Quest' : 'Side Quest'} • ${quest.time || 'Anytime'}</span>
                 <small class="status status-ready">
+                
                   ${kidNames[quest.kidId] || quest.kidId} • +${quest.xp || 0} XP • +${quest.gold || 0} Gold
                 </small>
+                <div class="parent-buttons">
+  <button class="edit-quest-btn" data-quest-id="${quest.questId}">✏️ Edit</button>
+</div>
+
               </div>
             </div>
           `).join('')}
@@ -552,7 +557,102 @@ async function loadQuestManager() {
         <a class="back-link" href="?parent=true">← Back to Guild Hall</a>
       </main>
     `;
+document.querySelectorAll('.edit-quest-btn').forEach(button => {
+  button.addEventListener('click', () => {
+    loadEditQuestForm(button.dataset.questId);
+  });
+});
+
   } catch (err) {
     showError("Quest manager error: " + err.message);
+  }
+}
+async function loadEditQuestForm(questId) {
+  try {
+    const questSnap = await getDoc(doc(db, "quests", questId));
+    const kidsSnap = await getDocs(collection(db, "kids"));
+
+    if (!questSnap.exists()) {
+      showError("Quest not found.");
+      return;
+    }
+
+    const quest = questSnap.data();
+
+    const kids = [];
+    kidsSnap.forEach(docSnap => {
+      kids.push({
+        kidId: docSnap.id,
+        ...docSnap.data()
+      });
+    });
+
+    document.body.innerHTML = `
+      <main class="app">
+        <header class="hero compact">
+          <div class="logo">✏️</div>
+          <h1>Edit Quest</h1>
+          <p>${quest.name}</p>
+        </header>
+
+        <section class="card">
+          <label>Quest Name</label>
+          <input id="questName" value="${quest.name || ''}">
+
+          <label>Assigned Kid</label>
+          <select id="questKid">
+            ${kids.map(kid => `
+              <option value="${kid.kidId}" ${quest.kidId === kid.kidId ? 'selected' : ''}>
+                ${kid.name}
+              </option>
+            `).join('')}
+          </select>
+
+          <label>Type</label>
+          <select id="questType">
+            <option value="daily" ${quest.type === 'daily' ? 'selected' : ''}>Daily Quest</option>
+            <option value="bonus" ${quest.type === 'bonus' ? 'selected' : ''}>Side Quest</option>
+          </select>
+
+          <label>Time</label>
+          <input id="questTime" value="${quest.time || 'Anytime'}">
+
+          <label>XP</label>
+          <input id="questXp" type="number" value="${quest.xp || 0}">
+
+          <label>Gold</label>
+          <input id="questGold" type="number" value="${quest.gold || 0}">
+
+          <label>Helper Bonus</label>
+          <input id="questHelperBonus" type="number" value="${quest.helperBonus || 0}">
+
+          <label>
+            <input id="questActive" type="checkbox" ${quest.active ? 'checked' : ''}>
+            Active
+          </label>
+
+          <button id="saveQuestBtn">Save Quest</button>
+        </section>
+
+        <a class="back-link" href="?parent=true&manager=true">← Back to Quest Manager</a>
+      </main>
+    `;
+
+    document.getElementById('saveQuestBtn').addEventListener('click', async () => {
+      await updateDoc(doc(db, "quests", questId), {
+        name: document.getElementById('questName').value,
+        kidId: document.getElementById('questKid').value,
+        type: document.getElementById('questType').value,
+        time: document.getElementById('questTime').value,
+        xp: Number(document.getElementById('questXp').value || 0),
+        gold: Number(document.getElementById('questGold').value || 0),
+        helperBonus: Number(document.getElementById('questHelperBonus').value || 0),
+        active: document.getElementById('questActive').checked
+      });
+
+      loadQuestManager();
+    });
+  } catch (err) {
+    showError("Edit quest error: " + err.message);
   }
 }
