@@ -1,5 +1,4 @@
 import "./firebase.js";
-const isManager = params.get('manager') === 'true';
 
 const {
   db,
@@ -15,6 +14,7 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbwwtxIFj6BaOWinXmPV2BTg
 const params = new URLSearchParams(window.location.search);
 const kidId = params.get('kid');
 const isParent = params.get('parent') === 'true';
+const isManager = params.get('manager') === 'true';
 
 if (isParent && isManager) {
   loadQuestManager();
