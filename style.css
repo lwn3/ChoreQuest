@@ -205,3 +205,27 @@ button.approved {
   margin: 18px 0;
   text-decoration: none;
 }
+.form-card {
+  display: grid;
+  gap: 10px;
+}
+
+.form-card label {
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.form-card input,
+.form-card select {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  font-size: 16px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
