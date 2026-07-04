@@ -351,9 +351,45 @@ function showError(message) {
     </main>
   `;
 }
-function approveQuest(logId) {
-  parentAction('approveQuest', logId);
+async function approveQuest(logId) {
+  try {
+    const questRef = doc(db, "quests", logId);
+    const questSnap = await getDoc(questRef);
+
+    if (!questSnap.exists()) {
+      alert("Quest not found.");
+      return;
+    }
+
+    const quest = questSnap.data();
+    const kidRef = doc(db, "kids", quest.kidId);
+    const kidSnap = await getDoc(kidRef);
+
+    if (!kidSnap.exists()) {
+      alert("Kid not found.");
+      return;
+    }
+
+    const kid = kidSnap.data();
+
+    await updateDoc(questRef, {
+      status: "Approved",
+      approvedAt: new Date().toISOString()
+    });
+
+    await updateDoc(kidRef, {
+      xp: Number(kid.xp || 0) + Number(quest.xp || 0),
+      gold: Number(kid.gold || 0) + Number(quest.gold || 0),
+      lifetimeQuests: Number(kid.lifetimeQuests || 0) + 1
+    });
+
+    loadParentDashboard();
+  } catch (err) {
+    alert("Could not approve quest: " + err.message);
+  }
 }
+
+window.approveQuest = approveQuest;
 
 function rejectQuest(logId) {
   parentAction('rejectQuest', logId);
