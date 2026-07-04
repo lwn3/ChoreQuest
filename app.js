@@ -260,10 +260,14 @@ async function loadParentDashboard() {
       });
     });
 
+    const kidNames = {};
+    kids.forEach(kid => {
+      kidNames[kid.kidId] = kid.name;
+    });
+
     const pending = [];
     questSnap.forEach(docSnap => {
       const quest = {
-        logId: docSnap.id,
         choreId: docSnap.id,
         ...docSnap.data()
       };
@@ -272,8 +276,8 @@ async function loadParentDashboard() {
         pending.push({
           logId: quest.choreId,
           choreName: quest.name,
-          assignedKid: quest.kidId,
-          completedBy: quest.completedBy || quest.kidId
+          assignedKid: kidNames[quest.kidId] || quest.kidId,
+          completedBy: kidNames[quest.completedBy] || quest.completedBy || kidNames[quest.kidId] || quest.kidId
         });
       }
     });
@@ -286,6 +290,7 @@ async function loadParentDashboard() {
     showError("Firebase parent error: " + err.message);
   }
 }
+
 
 
 function renderParentDashboard(data) {
