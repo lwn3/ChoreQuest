@@ -237,38 +237,56 @@ function showToast(message) {
   }, 1800);
 }
 
-function loadParentDashboard() {
+async function loadParentDashboard() {
   document.body.innerHTML = `
     <main class="app">
       <header class="hero">
         <div class="logo">🛡️</div>
         <h1>Guild Hall</h1>
-        <p>Parent Dashboard</p>
+        <p>Loading quest review...</p>
       </header>
     </main>
   `;
 
-  const callbackName = 'parentDashboardCallback_' + Date.now();
+  try {
+    const kidsSnap = await getDocs(collection(db, "kids"));
+    const questSnap = await getDocs(collection(db, "quests"));
 
-  window[callbackName] = function(data) {
-    delete window[callbackName];
+    const kids = [];
+    kidsSnap.forEach(docSnap => {
+      kids.push({
+        kidId: docSnap.id,
+        ...docSnap.data()
+      });
+    });
 
-    if (data.error) {
-      showError(data.error);
-      return;
-    }
+    const pending = [];
+    questSnap.forEach(docSnap => {
+      const quest = {
+        logId: docSnap.id,
+        choreId: docSnap.id,
+        ...docSnap.data()
+      };
 
-    renderParentDashboard(data);
-  };
+      if (quest.status === "Pending") {
+        pending.push({
+          logId: quest.choreId,
+          choreName: quest.name,
+          assignedKid: quest.kidId,
+          completedBy: quest.completedBy || quest.kidId
+        });
+      }
+    });
 
-  const script = document.createElement('script');
-  script.src =
-    API_URL +
-    '?action=parentDashboard' +
-    '&callback=' + callbackName;
-
-  document.body.appendChild(script);
+    renderParentDashboard({
+      kids,
+      pending
+    });
+  } catch (err) {
+    showError("Firebase parent error: " + err.message);
+  }
 }
+
 
 function renderParentDashboard(data) {
   document.body.innerHTML = `
