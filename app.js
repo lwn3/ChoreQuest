@@ -601,7 +601,7 @@ async function loadEditQuestForm(questId) {
           <p>${quest.name}</p>
         </header>
 
-        <section class="card">
+        <section class="card form-card">
           <label>Quest Name</label>
           <input id="questName" value="${quest.name || ''}">
 
@@ -632,7 +632,7 @@ async function loadEditQuestForm(questId) {
           <label>Helper Bonus</label>
           <input id="questHelperBonus" type="number" value="${quest.helperBonus || 0}">
 
-          <label>
+          <label class="checkbox-row">
             <input id="questActive" type="checkbox" ${quest.active ? 'checked' : ''}>
             Active
           </label>
@@ -681,7 +681,7 @@ async function loadNewQuestForm() {
         <p>Create a new chore quest</p>
       </header>
 
-      <section class="card">
+      <section class="card form-card">
         <label>Quest Name</label>
         <input id="questName" value="">
 
@@ -710,7 +710,7 @@ async function loadNewQuestForm() {
         <label>Helper Bonus</label>
         <input id="questHelperBonus" type="number" value="3">
 
-        <label>
+        <label class="checkbox-row">
           <input id="questActive" type="checkbox" checked>
           Active
         </label>
