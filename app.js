@@ -6,7 +6,8 @@ const {
   doc,
   getDoc,
   getDocs,
-  updateDoc
+  updateDoc,
+  addDoc
 } = window.ChoreQuestFirebase;
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbwwtxIFj6BaOWinXmPV2BTgdsUdRvqpqtp_0bzoSJv2_C3E2PoHLbKRBj4oH-RPEAUy/exec';
@@ -553,6 +554,7 @@ async function loadQuestManager() {
             </div>
           `).join('')}
         </section>
+<button id="newQuestBtn">➕ New Quest</button>
 
         <a class="back-link" href="?parent=true">← Back to Guild Hall</a>
       </main>
@@ -561,6 +563,10 @@ document.querySelectorAll('.edit-quest-btn').forEach(button => {
   button.addEventListener('click', () => {
     loadEditQuestForm(button.dataset.questId);
   });
+  document.getElementById('newQuestBtn').addEventListener('click', () => {
+  loadNewQuestForm();
+});
+
 });
 
   } catch (err) {
@@ -655,4 +661,82 @@ async function loadEditQuestForm(questId) {
   } catch (err) {
     showError("Edit quest error: " + err.message);
   }
+}
+async function loadNewQuestForm() {
+  const kidsSnap = await getDocs(collection(db, "kids"));
+
+  const kids = [];
+  kidsSnap.forEach(docSnap => {
+    kids.push({
+      kidId: docSnap.id,
+      ...docSnap.data()
+    });
+  });
+
+  document.body.innerHTML = `
+    <main class="app">
+      <header class="hero compact">
+        <div class="logo">➕</div>
+        <h1>New Quest</h1>
+        <p>Create a new chore quest</p>
+      </header>
+
+      <section class="card">
+        <label>Quest Name</label>
+        <input id="questName" value="">
+
+        <label>Assigned Kid</label>
+        <select id="questKid">
+          ${kids.map(kid => `
+            <option value="${kid.kidId}">${kid.name}</option>
+          `).join('')}
+        </select>
+
+        <label>Type</label>
+        <select id="questType">
+          <option value="daily">Daily Quest</option>
+          <option value="bonus">Side Quest</option>
+        </select>
+
+        <label>Time</label>
+        <input id="questTime" value="Anytime">
+
+        <label>XP</label>
+        <input id="questXp" type="number" value="5">
+
+        <label>Gold</label>
+        <input id="questGold" type="number" value="5">
+
+        <label>Helper Bonus</label>
+        <input id="questHelperBonus" type="number" value="3">
+
+        <label>
+          <input id="questActive" type="checkbox" checked>
+          Active
+        </label>
+
+        <button id="saveQuestBtn">Create Quest</button>
+      </section>
+
+      <a class="back-link" href="?parent=true&manager=true">← Back to Quest Manager</a>
+    </main>
+  `;
+
+  document.getElementById('saveQuestBtn').addEventListener('click', async () => {
+    await addDoc(collection(db, "quests"), {
+      name: document.getElementById('questName').value,
+      kidId: document.getElementById('questKid').value,
+      type: document.getElementById('questType').value,
+      time: document.getElementById('questTime').value,
+      xp: Number(document.getElementById('questXp').value || 0),
+      gold: Number(document.getElementById('questGold').value || 0),
+      helperBonus: Number(document.getElementById('questHelperBonus').value || 0),
+      active: document.getElementById('questActive').checked,
+      status: "Ready",
+      completedBy: "",
+      lastResetDate: getTodayKey()
+    });
+
+    loadQuestManager();
+  });
 }
