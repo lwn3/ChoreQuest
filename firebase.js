@@ -11,6 +11,14 @@ import {
   query,
   where
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+// 1. Import Auth dependency
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signOut, 
+  onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDeSI1GanQ0yUXmexvVOzrk3DVbRYqbxqI",
@@ -23,6 +31,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+// 2. Initialize Auth
+const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
 
 window.ChoreQuestFirebase = {
   db,
@@ -34,5 +45,11 @@ window.ChoreQuestFirebase = {
   updateDoc,
   addDoc,
   query,
-  where
+  where,
+  // 3. Expose them to app.js
+  auth,
+  googleProvider,
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged
 };
