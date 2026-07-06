@@ -24,37 +24,39 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbwwtxIFj6BaOWinXmPV2BTg
 const ADMIN_EMAIL = 'lawrencewnelson3@gmail.com';
 const CO_PARENT_EMAIL = 'anitanelson1987@gmail.com';
 
-// Handle initial authentication listener
-onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    renderLoginScreen();
-    return;
-  }
+function initializeAuthRouter() {
+  const { onAuthStateChanged, auth } = window.ChoreQuestFirebase;
 
-  const email = user.email.toLowerCase();
-
-  // ROUTE PARENTS AUTOMATICALLY TO BLUEPRINTS / GUILD MASTER INTERFACE
-  if (email === ADMIN_EMAIL) {
-    loadQuestManager(user);
-    return;
-  }
-  
-  if (email === CO_PARENT_EMAIL) {
-    const params = new URLSearchParams(window.location.search);
-    const isManager = params.get('manager') === 'true';
-
-    if (isManager) {
-      alert("Access Denied: Only the Guild Master can manage quest blueprints.");
-      window.history.replaceState({}, document.title, window.location.pathname);
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      renderLoginScreen();
+      return;
     }
+
+    const email = user.email.toLowerCase();
+
+    // ROUTE PARENTS AUTOMATICALLY TO BLUEPRINTS / GUILD MASTER INTERFACE
+    if (email === ADMIN_EMAIL) {
+      loadQuestManager(user);
+      return;
+    }
+    
+    if (email === CO_PARENT_EMAIL) {
+      const params = new URLSearchParams(window.location.search);
+      const isManager = params.get('manager') === 'true';
+
+      if (isManager) {
+        alert("Access Denied: Only the Guild Master can manage quest blueprints.");
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+      loadUserDashboard(user);
+      return;
+    }
+
+    // Route Children
     loadUserDashboard(user);
-    return;
-  }
-
-  // Route Children
-  loadUserDashboard(user);
-});
-
+  });
+}
 // --- CHARACTER SELECTION SCREEN ---
 async function loadUserDashboard(user) {
   document.body.innerHTML = `
@@ -673,6 +675,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
         console.error("Redirect login failed:", err);
     }
+
+    // Fire the router now that Firebase handles are stable and ready!
+    initializeAuthRouter();
 });
 
 // Helper function to render a clean login state if needed
