@@ -690,13 +690,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const { getRedirectResult, auth } = window.ChoreQuestFirebase;
     
     try {
-        // Since getRedirectResult was unpacked above, we can look for it here
         if (getRedirectResult) {
+            // 1. Force the app to wait until Firebase completely handles the Google token
             await getRedirectResult(auth);
         }
     } catch (err) {
         console.error("Redirect login failed:", err);
+        showError("Login error: " + err.message);
     }
     
+    // 2. ONLY check the auth state and change the screen AFTER the landing is settled
     checkAuthState();
 });
