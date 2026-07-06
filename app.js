@@ -697,8 +697,7 @@ function checkAuthState() {
                         showError("Sign in failed: " + err.message);
                     });
             });
-        }
-    };
+    });
 }
 
 // --- INITIALIZATION ---
