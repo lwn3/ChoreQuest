@@ -696,7 +696,6 @@ function checkAuthState() {
         .catch(err => {
             showError("Sign in failed: " + err.message);
           });
-        })
     });
 } // <-- This closes checkAuthState()
 
