@@ -13,6 +13,7 @@ const {
   auth,
   googleProvider,
   signInWithRedirect,
+  getRedirectResult,
   signOut,
   onAuthStateChanged
 } = window.ChoreQuestFirebase;
@@ -674,23 +675,28 @@ function checkAuthState() {
                 </main>
             `;
             document.getElementById('googleSignInBtn').addEventListener('click', () => {
-    // Explicitly scope the provider and method to the global firebase object
-    const provider = new window.firebase.auth.GoogleAuthProvider();
-    window.firebase.auth().signInWithRedirect(provider).catch(err => showError(err.message));
+    // Extract the functions directly from your global namespace object
+    const { signInWithRedirect, googleProvider, auth } = window.ChoreQuestFirebase;
+    
+    // Trigger the redirect natively using your configured modules
+    signInWithRedirect(auth, googleProvider).catch(err => showError(err.message));
 });
         }
     });
 }
 
 // --- INITIALIZATION ---
-document.addEventListener('DOMContentLoaded', () => {
-    // Grabs the root auth service safely from the window's firebase instance
-    window.firebase.auth().getRedirectResult()
-        .then(() => {
-            checkAuthState();
-        })
-        .catch(err => {
-            showError("Redirect login failed: " + err.message);
-            checkAuthState();
-        });
+document.addEventListener('DOMContentLoaded', async () => {
+    const { getRedirectResult, auth } = window.ChoreQuestFirebase;
+    
+    try {
+        // Since getRedirectResult was unpacked above, we can look for it here
+        if (getRedirectResult) {
+            await getRedirectResult(auth);
+        }
+    } catch (err) {
+        console.error("Redirect login failed:", err);
+    }
+    
+    checkAuthState();
 });
