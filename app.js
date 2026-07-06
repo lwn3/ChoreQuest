@@ -696,8 +696,10 @@ function checkAuthState() {
         .catch(err => {
             showError("Sign in failed: " + err.message);
         });
-});
+        }
+    });
 }
+
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
     const { getRedirectResult, auth } = window.ChoreQuestFirebase;
