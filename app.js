@@ -674,8 +674,9 @@ function checkAuthState() {
                 </main>
             `;
             document.getElementById('googleSignInBtn').addEventListener('click', () => {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithRedirect(provider).catch(err => showError(err.message));
+    // Pulls the Google provider constructor directly from the internal auth object
+    const provider = new auth.auth.GoogleAuthProvider();
+    auth.auth.signInWithRedirect(provider).catch(err => showError(err.message));
 });
         }
     });
@@ -683,7 +684,8 @@ function checkAuthState() {
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
-    auth.getRedirectResult()
+    // Accesses the root auth service via the instance wrapper
+    auth.auth.getRedirectResult()
         .then(() => {
             checkAuthState();
         })
