@@ -695,10 +695,10 @@ function checkAuthState() {
         })
         .catch(err => {
             showError("Sign in failed: " + err.message);
-        });
+          });
         }
     });
-}
+} // <-- This closes checkAuthState()
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
@@ -706,7 +706,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     try {
         if (getRedirectResult) {
-            // 1. Force the app to wait until Firebase completely handles the Google token
             await getRedirectResult(auth);
         }
     } catch (err) {
@@ -714,6 +713,5 @@ document.addEventListener('DOMContentLoaded', async () => {
         showError("Login error: " + err.message);
     }
     
-    // 2. ONLY check the auth state and change the screen AFTER the landing is settled
     checkAuthState();
-});
+}); // <-- This closes the event listener cleanly at the absolute end of the file
