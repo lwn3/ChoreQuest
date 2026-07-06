@@ -50,6 +50,8 @@ window.ChoreQuestFirebase = {
   // 3. Expose them to app.js
   auth,
   googleProvider,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithPopup,
   signOut,
   onAuthStateChanged
