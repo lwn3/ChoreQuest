@@ -673,12 +673,12 @@ function checkAuthState() {
                     </section>
                 </main>
             `;
-            // Replace the old popup code with this:
-document.getElementById('googleSignInBtn').addEventListener('click', () => {
-    const provider = new google.firebase.auth.GoogleAuthProvider();
+            document.getElementById('googleSignInBtn').addEventListener('click', () => {
+    // Correct standard web namespace provider
+    const provider = new firebase.auth.GoogleAuthProvider();
     
-    // This handles the login inside the exact same tab—no popups required
-    auth.signInWithRedirect(provider).catch(err => showError(err.message));
+    // Trigger the redirect using the correct instance method
+    firebase.auth().signInWithRedirect(provider).catch(err => showError(err.message));
 });
         }
     });
@@ -686,5 +686,13 @@ document.getElementById('googleSignInBtn').addEventListener('click', () => {
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
-    checkAuthState();
+    // Catch the redirect results before checking the general auth state
+    firebase.auth().getRedirectResult()
+        .then(() => {
+            checkAuthState();
+        })
+        .catch(err => {
+            showError("Redirect login failed: " + err.message);
+            checkAuthState();
+        });
 });
