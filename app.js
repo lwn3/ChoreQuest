@@ -656,6 +656,30 @@ async function loadNewQuestForm() {
         }
     });
 }
+// Add this right above the DOMContentLoaded block at the bottom
+function checkAuthState() {
+    auth.onAuthStateChanged((user) => {
+        if (user) {
+            // If logged in, pass user to your dashboard loader
+            loadQuestManager(user); 
+        } else {
+            // If logged out, make sure the login UI is visible
+            document.body.innerHTML = `
+                <main class="app">
+                    <header class="hero"><div class="logo">⚔️</div><h1>ChoreQuest</h1><p>Complete quests. Earn XP. Unlock rewards.</p></header>
+                    <section class="card login-card">
+                        <h2>Enter the Realm</h2>
+                        <button id="googleSignInBtn" class="btn-primary">Sign In with Google</button>
+                    </section>
+                </main>
+            `;
+            document.getElementById('googleSignInBtn').addEventListener('click', () => {
+                const provider = new google.firebase.auth.GoogleAuthProvider(); // or your specific provider import
+                auth.signInWithPopup(provider).catch(err => showError(err.message));
+            });
+        }
+    });
+}
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
