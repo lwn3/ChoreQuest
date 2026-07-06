@@ -608,10 +608,56 @@ async function loadEditQuestForm(questId) {
 }
 
 async function loadNewQuestForm() {
-  const kidsSnap = await getDocs(collection(db, "kids"));
-  const kids = [];
-  kidsSnap.forEach(docSnap => { kids.push({ kidId: docSnap.id, ...docSnap.data() }); });
+    const kidsSnap = await getDocs(collection(db, "kids"));
+    const kids = [];
+    kidsSnap.forEach(docSnap => { kids.push({ kidId: docSnap.id, ...docSnap.data() }); });
 
-  document.body.innerHTML = `
-    <main class="app">
-      <header class="hero compact"><div class="logo">➕</div><h1>New Ques
+    document.body.innerHTML = `
+        <main class="app">
+            <header class="hero compact"><div class="logo">➕</div><h1>New Quest</h1></header>
+            <section class="card">
+                <form id="newQuestForm">
+                    <label>Quest Name</label><input id="questName" required placeholder="Defeat the Laundry Dragon...">
+                    <label>Assign To</label>
+                    <select id="questKid" required>
+                        ${kids.map(k => `<option value="${k.kidId}">${k.name}</option>`).join('')}
+                    </select>
+                    <label>Type</label>
+                    <select id="questType">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="epic">Epic</option>
+                    </select>
+                    <label>Time Limit</label><input id="questTime" placeholder="Before bed, 1 hour, etc.">
+                    <label>XP Reward</label><input id="questXp" type="number" value="10">
+                    <label>Gold Reward</label><input id="questGold" type="number" value="5">
+                    <button type="submit">Create Quest Blueprint</button>
+                </form>
+            </section>
+            <a class="back-link" href="?manager=true">← Cancel</a>
+        </main>
+    `;
+
+    document.getElementById('newQuestForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+            await addDoc(collection(db, "quests"), {
+                name: document.getElementById('questName').value,
+                kidId: document.getElementById('questKid').value,
+                type: document.getElementById('questType').value,
+                time: document.getElementById('questTime').value,
+                xp: Number(document.getElementById('questXp').value || 0),
+                gold: Number(document.getElementById('questGold').value || 0),
+                status: "available"
+            });
+            loadQuestManager(auth.currentUser);
+        } catch (err) {
+            showError("Error creating quest: " + err.message);
+        }
+    });
+}
+
+// --- INITIALIZATION ---
+document.addEventListener('DOMContentLoaded', () => {
+    checkAuthState();
+});
