@@ -657,34 +657,40 @@ async function loadNewQuestForm() {
         }
     });
 }
-// Add this right above the DOMContentLoaded block at the bottom
+// --- AUTHENTICATION STATE CHECK ---
 function checkAuthState() {
-    auth.onAuthStateChanged((user) => {
+    const { onAuthStateChanged, auth } = window.ChoreQuestFirebase;
+
+    onAuthStateChanged(auth, (user) => {
         if (user) {
-            // If logged in, pass user to your dashboard loader
+            // Logged in! Head to the dashboard
             loadQuestManager(user); 
         } else {
-            // If logged out, make sure the login UI is visible
+            // Check if the login card already exists. If it does, do nothing!
+            // This prevents overwriting the screen while a redirect finishes landing.
+            if (document.getElementById('googleSignInBtn')) return;
+
             document.body.innerHTML = `
                 <main class="app">
-                    <header class="hero"><div class="logo">⚔️</div><h1>ChoreQuest</h1><p>Complete quests. Earn XP. Unlock rewards.</p></header>
+                    <header class="hero">
+                        <div class="logo">⚔️</div>
+                        <h1>ChoreQuest</h1>
+                        <p>Complete quests. Earn XP. Unlock rewards.</p>
+                    </header>
                     <section class="card login-card">
                         <h2>Enter the Realm</h2>
                         <button id="googleSignInBtn" class="btn-primary">Sign In with Google</button>
                     </section>
                 </main>
             `;
+            
             document.getElementById('googleSignInBtn').addEventListener('click', () => {
-    // Extract the functions directly from your global namespace object
-    const { signInWithRedirect, googleProvider, auth } = window.ChoreQuestFirebase;
-    
-    // Trigger the redirect natively using your configured modules
-    signInWithRedirect(auth, googleProvider).catch(err => showError(err.message));
-});
+                const { signInWithRedirect, googleProvider } = window.ChoreQuestFirebase;
+                signInWithRedirect(auth, googleProvider).catch(err => showError(err.message));
+            });
         }
     });
 }
-
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
     const { getRedirectResult, auth } = window.ChoreQuestFirebase;
