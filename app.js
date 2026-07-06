@@ -697,13 +697,27 @@ function checkAuthState() {
                         showError("Sign in failed: " + err.message);
                     });
             });
-    };
-})
+        }
+    });
+}
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
     const { getRedirectResult, auth } = window.ChoreQuestFirebase;
 
+    try {
+        if (getRedirectResult) {
+            // Force the app to wait until Firebase completely handles the Google token
+            await getRedirectResult(auth);
+        }
+    } catch (err) {
+        console.error("Redirect login failed:", err);
+        showError("Login error: " + err.message);
+    }
+
+    // ONLY check the auth state and change the screen AFTER the landing is settled
+    checkAuthState();
+});
     try {
         if (getRedirectResult) {
             // Force the app to wait until Firebase completely handles the Google token
