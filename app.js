@@ -12,7 +12,7 @@ const {
   where,
   auth,
   googleProvider,
-  signInWithPopup,
+  signInWithRedirect,
   signOut,
   onAuthStateChanged
 } = window.ChoreQuestFirebase;
@@ -95,7 +95,7 @@ function renderLoginScreen() {
 
   document.getElementById('loginBtn').addEventListener('click', async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      await signInWithRedirect(auth, googleProvider);
     } catch (err) {
       alert("Login failed: " + err.message);
     }
@@ -673,10 +673,13 @@ function checkAuthState() {
                     </section>
                 </main>
             `;
-            document.getElementById('googleSignInBtn').addEventListener('click', () => {
-                const provider = new google.firebase.auth.GoogleAuthProvider(); // or your specific provider import
-                auth.signInWithRedirect(provider).catch(err => showError(err.message));
-            });
+            // Replace the old popup code with this:
+document.getElementById('googleSignInBtn').addEventListener('click', () => {
+    const provider = new google.firebase.auth.GoogleAuthProvider();
+    
+    // This handles the login inside the exact same tab—no popups required
+    auth.signInWithRedirect(provider).catch(err => showError(err.message));
+});
         }
     });
 }
