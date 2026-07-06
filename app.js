@@ -33,91 +33,27 @@ onAuthStateChanged(auth, async (user) => {
 
   const email = user.email.toLowerCase();
 
-  // Route Parents
-  if (email === ADMIN_EMAIL || email === CO_PARENT_EMAIL) {
+  // ROUTE PARENTS AUTOMATICALLY TO BLUEPRINTS / GUILD MASTER INTERFACE
+  if (email === ADMIN_EMAIL) {
+    loadQuestManager(user);
+    return;
+  }
+  
+  if (email === CO_PARENT_EMAIL) {
     const params = new URLSearchParams(window.location.search);
     const isManager = params.get('manager') === 'true';
 
     if (isManager) {
-      if (email === ADMIN_EMAIL) {
-        loadQuestManager(user);
-      } else {
-        alert("Access Denied: Only the Guild Master can manage quest blueprints.");
-        window.history.replaceState({}, document.title, window.location.pathname);
-        loadParentDashboard(user);
-      }
-    } else {
-      loadParentDashboard(user);
+      alert("Access Denied: Only the Guild Master can manage quest blueprints.");
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
+    loadUserDashboard(user);
     return;
   }
 
-  // Route Kids by matching Firestore email field
-  try {
-    const kidsRef = collection(db, "kids");
-    const q = query(kidsRef, where("email", "==", email));
-    const querySnapshot = await getDocs(q);
-
-    if (querySnapshot.empty) {
-      document.body.innerHTML = `
-        <main class="app">
-          <section class="card">
-            <h2>Halt, Traveler!</h2>
-            <p>Your email (${email}) is not registered to a character slot. Ask your parent to register you in Firestore.</p>
-            <button onclick="window.ChoreQuestFirebase.signOut(window.ChoreQuestFirebase.auth)">Sign Out</button>
-          </section>
-        </main>
-      `;
-      return;
-    }
-
-    // Match found
-    const kidDoc = querySnapshot.docs[0];
-    loadKidDashboard(kidDoc.id);
-  } catch (err) {
-    showError("Authentication Routing Error: " + err.message);
-  }
+  // Route Children
+  loadUserDashboard(user);
 });
-
-function renderLoginScreen() {
-  document.body.innerHTML = `
-    <main class="app">
-      <header class="hero">
-        <div class="logo">⚔️</div>
-        <h1>ChoreQuest</h1>
-        <p>Complete quests. Earn XP. Unlock rewards.</p>
-      </header>
-      <section class="card" style="text-align: center; padding: 30px 20px;">
-        <h2 style="margin-bottom: 20px;">Enter the Realm</h2>
-        <button id="loginBtn" style="font-size: 18px; padding: 12px 24px; cursor: pointer;">Sign In with Google</button>
-      </section>
-    </main>
-  `;
-
-  document.getElementById('loginBtn').addEventListener('click', async () => {
-    try {
-      await signInWithRedirect(auth, googleProvider);
-    } catch (err) {
-      alert("Login failed: " + err.message);
-    }
-  });
-}
-
-function renderSignOutHeader(user) {
-  return `
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 10px; background: rgba(0,0,0,0.2); border-radius: 8px; margin-bottom: 15px; font-size: 12px;">
-      <span>Logged in: <strong>${user.displayName || user.email}</strong></span>
-      <a href="#" id="signOutLink" style="color: #f87171; text-decoration: none; font-weight: bold;">Leave Party</a>
-    </div>
-  `;
-}
-
-function attachSignOutEvent() {
-  document.getElementById('signOutLink')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    signOut(auth);
-  });
-}
 
 async function loadKidDashboard(kidId) {
   document.body.innerHTML = `
@@ -707,27 +643,36 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
         if (getRedirectResult) {
-            // Force the app to wait until Firebase completely handles the Google token
             await getRedirectResult(auth);
         }
     } catch (err) {
         console.error("Redirect login failed:", err);
-        showError("Login error: " + err.message);
     }
-
-    // ONLY check the auth state and change the screen AFTER the landing is settled
-    checkAuthState();
 });
-    try {
-        if (getRedirectResult) {
-            // Force the app to wait until Firebase completely handles the Google token
-            await getRedirectResult(auth);
-        }
-    } catch (err) {
-        console.error("Redirect login failed:", err);
-        showError("Login error: " + err.message);
-    }
 
-    // ONLY check the auth state and change the screen AFTER the landing is settled
-    checkAuthState();
-});
+// Helper function to render a clean login state if needed
+function renderLoginScreen() {
+    if (document.getElementById('googleSignInBtn')) return;
+
+    document.body.innerHTML = `
+        <main class="app">
+            <header class="hero">
+                <div class="logo">⚔️</div>
+                <h1>ChoreQuest</h1>
+                <p>Complete quests. Earn XP. Unlock rewards.</p>
+            </header>
+            <section class="card login-card">
+                <h2>Enter the Realm</h2>
+                <button id="googleSignInBtn" class="btn-primary">Sign In with Google</button>
+            </section>
+        </main>
+    `;
+
+    document.getElementById('googleSignInBtn').addEventListener('click', () => {
+        const { signInWithPopup, googleProvider, auth } = window.ChoreQuestFirebase;
+        signInWithPopup(auth, googleProvider)
+            .catch((err) => {
+                alert("Sign in failed: " + err.message);
+            });
+    });
+}
