@@ -675,7 +675,7 @@ function checkAuthState() {
             `;
             document.getElementById('googleSignInBtn').addEventListener('click', () => {
                 const provider = new google.firebase.auth.GoogleAuthProvider(); // or your specific provider import
-                auth.signInWithPopup(provider).catch(err => showError(err.message));
+                auth.signInWithRedirect(provider).catch(err => showError(err.message));
             });
         }
     });
