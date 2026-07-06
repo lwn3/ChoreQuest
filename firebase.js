@@ -16,6 +16,7 @@ import {
   getAuth, 
   GoogleAuthProvider, 
   signInWithPopup,
+  signInWithRedirect,
   getRedirectResult, 
   signOut, 
   onAuthStateChanged 
