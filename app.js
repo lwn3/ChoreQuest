@@ -664,7 +664,7 @@ function checkAuthState() {
     onAuthStateChanged(auth, (user) => {
         if (user) {
             // Logged in! Head to the dashboard
-            loadQuestManager(user); 
+            loadQuestManager(user);
         } else {
             // Check if the login card already exists. If it does, do nothing!
             // This prevents overwriting the screen while a redirect finishes landing.
@@ -683,35 +683,38 @@ function checkAuthState() {
                     </section>
                 </main>
             `;
-            
+
             document.getElementById('googleSignInBtn').addEventListener('click', () => {
-    const { signInWithPopup, googleProvider, auth } = window.ChoreQuestFirebase;
-    
-    // Attempt standard popup auth now that the script environment is stable
-    signInWithPopup(auth, googleProvider)
-        .then((result) => {
-            // Force immediate load upon successful login
-            loadQuestManager(result.user);
-        })
-        .catch(err => {
-            showError("Sign in failed: " + err.message);
-});
-        });
+                const { signInWithPopup, googleProvider, auth } = window.ChoreQuestFirebase;
+
+                // Attempt standard popup auth now that the script environment is stable
+                signInWithPopup(auth, googleProvider)
+                    .then((result) => {
+                        // Force immediate load upon successful login
+                        loadQuestManager(result.user);
+                    })
+                    .catch((err) => {
+                        showError("Sign in failed: " + err.message);
+                    });
+            });
+        }
     });
 }
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
     const { getRedirectResult, auth } = window.ChoreQuestFirebase;
-    
+
     try {
         if (getRedirectResult) {
+            // Force the app to wait until Firebase completely handles the Google token
             await getRedirectResult(auth);
         }
     } catch (err) {
         console.error("Redirect login failed:", err);
         showError("Login error: " + err.message);
     }
-    
+
+    // ONLY check the auth state and change the screen AFTER the landing is settled
     checkAuthState();
-}); // <-- This closes the event listener cleanly at the absolute end of the file
+});
