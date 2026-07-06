@@ -674,11 +674,8 @@ function checkAuthState() {
                 </main>
             `;
             document.getElementById('googleSignInBtn').addEventListener('click', () => {
-    // Correct standard web namespace provider
     const provider = new firebase.auth.GoogleAuthProvider();
-    
-    // Trigger the redirect using the correct instance method
-    firebase.auth().signInWithRedirect(provider).catch(err => showError(err.message));
+    auth.signInWithRedirect(provider).catch(err => showError(err.message));
 });
         }
     });
@@ -686,8 +683,7 @@ function checkAuthState() {
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
-    // Catch the redirect results before checking the general auth state
-    firebase.auth().getRedirectResult()
+    auth.getRedirectResult()
         .then(() => {
             checkAuthState();
         })
