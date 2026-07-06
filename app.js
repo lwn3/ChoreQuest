@@ -698,7 +698,7 @@ function checkAuthState() {
                     });
             });
         }
-    });
+    };
 }
 
 // --- INITIALIZATION ---
