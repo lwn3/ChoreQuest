@@ -55,6 +55,31 @@ onAuthStateChanged(auth, async (user) => {
   loadUserDashboard(user);
 });
 
+// --- CHARACTER SELECTION SCREEN ---
+async function loadUserDashboard(user) {
+  document.body.innerHTML = `
+    <main class="app">
+      <header class="hero">
+        <div class="logo">🛡️</div>
+        <h1>Choose Your Character</h1>
+        <p>Select your profile to enter the realm</p>
+      </header>
+      <section class="character-select">
+        <button class="character-card-btn" onclick="loadKidDashboard('K001')">
+          <div class="avatar">🐺</div>
+          <strong>Autumn</strong>
+          <span>Level 1 Rogue</span>
+        </button>
+        <button class="character-card-btn" onclick="loadKidDashboard('K002')">
+          <div class="avatar">🦊</div>
+          <strong>Cammron</strong>
+          <span>Level 1 Warrior</span>
+        </button>
+      </section>
+    </main>
+  `;
+}
+
 async function loadKidDashboard(kidId) {
   document.body.innerHTML = `
     <main class="app">
