@@ -1225,4 +1225,145 @@ async function loadNewQuestForm() {
           <label
             style="display:flex; align-items:center; gap:8px;"
           >
-            <input id="questActive" type="checkbox"
+            <input id="questActive" type="checkbox" checked>
+            Active
+          </label>
+
+          <button id="createQuestBtn" type="button">
+            Create Quest Blueprint
+          </button>
+        </section>
+
+        <button id="cancelNewQuestBtn" type="button">
+          ← Cancel
+        </button>
+      </main>
+    `;
+
+    attachSignOutEvent();
+
+    document
+      .getElementById("createQuestBtn")
+      .addEventListener("click", async () => {
+        const name = document
+          .getElementById("questName")
+          .value.trim();
+
+        if (!name) {
+          alert("Please enter a quest name.");
+          return;
+        }
+
+        try {
+          await addDoc(collection(db, "quests"), {
+            name,
+            kidId: document.getElementById("questKid").value,
+            type: document.getElementById("questType").value,
+            time:
+              document.getElementById("questTime").value.trim() ||
+              "Anytime",
+            xp: Number(
+              document.getElementById("questXp").value || 0
+            ),
+            gold: Number(
+              document.getElementById("questGold").value || 0
+            ),
+            helperBonus: Number(
+              document.getElementById("questHelperBonus").value || 0
+            ),
+            active: document.getElementById("questActive").checked,
+            status: "Ready",
+            completedBy: "",
+            lastResetDate: getTodayKey()
+          });
+
+          await loadQuestManager(auth.currentUser);
+        } catch (err) {
+          showError("Error creating quest: " + err.message);
+        }
+      });
+
+    document
+      .getElementById("cancelNewQuestBtn")
+      .addEventListener("click", () => {
+        loadQuestManager(auth.currentUser);
+      });
+  } catch (err) {
+    showError("Could not open new quest form: " + err.message);
+  }
+}
+
+function formField(label, controlHtml) {
+  return `
+    <div
+      class="form-field"
+      style="display:flex; flex-direction:column; gap:4px;"
+    >
+      <label style="font-weight:700;">
+        ${escapeHtml(label)}
+      </label>
+
+      ${controlHtml}
+    </div>
+  `;
+}
+
+/* -------------------------------------------------
+   ERRORS AND SAFETY
+------------------------------------------------- */
+
+function showError(message) {
+  document.body.innerHTML = `
+    <main class="app">
+      <section class="card">
+        <h2>Something went wrong</h2>
+        <p>${escapeHtml(message)}</p>
+
+        <button id="resetConnectionBtn" type="button">
+          Reset Connection
+        </button>
+      </section>
+    </main>
+  `;
+
+  document
+    .getElementById("resetConnectionBtn")
+    .addEventListener("click", async () => {
+      try {
+        await signOut(auth);
+      } catch (err) {
+        console.error(err);
+      }
+
+      renderLoginScreen();
+    });
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value);
+}
+
+/* -------------------------------------------------
+   INITIALIZATION
+------------------------------------------------- */
+
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    if (getRedirectResult) {
+      await getRedirectResult(auth);
+    }
+  } catch (err) {
+    console.error("Redirect login failed:", err);
+  }
+
+  initializeAuthRouter();
+});
