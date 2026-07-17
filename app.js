@@ -8,6 +8,7 @@ const {
   getDocs,
   updateDoc,
   addDoc,
+  setDoc,
   deleteDoc,
   auth,
   googleProvider,
@@ -22,79 +23,65 @@ const ADMIN_EMAIL = "lawrencewnelson3@gmail.com";
 const CO_PARENT_EMAIL = "anitanelson1987@gmail.com";
 
 /* -------------------------------------------------
-   AUTHENTICATION AND ROUTING
+   AUTHENTICATION, ROUTING, AND PIN ACCESS
 ------------------------------------------------- */
 
+const PARENT_EMAILS = [ADMIN_EMAIL, CO_PARENT_EMAIL];
+const KID_UNLOCK_KEY = "chorequestUnlockedKid";
+
+function isParentUser(user) {
+  return Boolean(user && PARENT_EMAILS.includes(String(user.email || "").toLowerCase()));
+}
+
 function initializeAuthRouter() {
+  const params = new URLSearchParams(window.location.search);
+  const kidId = params.get("kid");
+
+  if (kidId) {
+    loadKidEntry(kidId);
+    return;
+  }
+
   onAuthStateChanged(auth, async user => {
-    if (!user) {
-      renderLoginScreen();
-      return;
-    }
-
-    const email = String(user.email || "").toLowerCase();
-    const params = new URLSearchParams(window.location.search);
     const isManager = params.get("manager") === "true";
+    const isFamily = params.get("family") === "true";
 
-    if (email === ADMIN_EMAIL) {
-      if (isManager) {
-        await loadQuestManager(user);
-      } else {
-        await loadParentDashboard(user);
-      }
+    if (!user) {
+      await loadUserDashboard(null);
       return;
     }
 
-    if (email === CO_PARENT_EMAIL) {
-      if (isManager) {
-        alert("Only the Guild Master can manage quest blueprints.");
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
+    if (!isParentUser(user)) {
+      await signOut(auth);
+      await loadUserDashboard(null);
+      return;
+    }
 
+    if (isManager) {
+      await loadQuestManager(user);
+    } else if (isFamily) {
+      await loadFamilyAccounts(user);
+    } else {
       await loadParentDashboard(user);
-      return;
     }
-
-    await loadUserDashboard(user);
   });
 }
 
+async function startParentSignIn() {
+  try {
+    await signInWithPopup(auth, googleProvider);
+  } catch (err) {
+    showError("Parent sign in failed: " + err.message);
+  }
+}
+
 function renderLoginScreen() {
-  if (document.getElementById("googleSignInBtn")) return;
-
-  document.body.innerHTML = `
-    <main class="app">
-      <header class="hero">
-        <div class="logo">⚔️</div>
-        <h1>ChoreQuest</h1>
-        <p>Complete quests. Earn XP. Unlock rewards.</p>
-      </header>
-
-      <section class="card login-card">
-        <h2>Enter the Realm</h2>
-        <button id="googleSignInBtn" class="btn-primary" type="button">
-          Sign In with Google
-        </button>
-      </section>
-    </main>
-  `;
-
-  document
-    .getElementById("googleSignInBtn")
-    .addEventListener("click", async () => {
-      try {
-        await signInWithPopup(auth, googleProvider);
-      } catch (err) {
-        showError("Sign in failed: " + err.message);
-      }
-    });
+  loadUserDashboard(null);
 }
 
 function renderSignOutHeader(user) {
   if (!user) return "";
-
   const displayName = user.displayName || user.email || "Signed in";
-
   return `
     <div class="account-header">
       <span>${escapeHtml(displayName)}</span>
@@ -106,10 +93,11 @@ function renderSignOutHeader(user) {
 function attachSignOutEvent() {
   const button = document.getElementById("signOutBtn");
   if (!button) return;
-
   button.addEventListener("click", async () => {
     try {
       await signOut(auth);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      await loadUserDashboard(null);
     } catch (err) {
       alert("Sign out failed: " + err.message);
     }
@@ -120,83 +108,103 @@ function attachSignOutEvent() {
    CHARACTER SELECTION
 ------------------------------------------------- */
 
-async function loadUserDashboard(user) {
-  document.body.innerHTML = `
-    <main class="app">
-      ${renderSignOutHeader(user)}
-
-      <header class="hero">
-        <div class="logo">🛡️</div>
-        <h1>Choose Your Character</h1>
-        <p>Select your profile to enter the realm.</p>
-      </header>
-
-      <section class="card">
-        <p>Loading adventurers...</p>
-      </section>
-    </main>
-  `;
-
-  attachSignOutEvent();
-
+async function loadUserDashboard(user = auth.currentUser) {
+  document.body.innerHTML = `<main class="app"><section class="card"><p>Loading profiles...</p></section></main>`;
   try {
     const kidsSnap = await getDocs(collection(db, "kids"));
     const kids = [];
-
     kidsSnap.forEach(docSnap => {
-      const kid = {
-        kidId: docSnap.id,
-        ...docSnap.data()
-      };
-
-      if (kid.active !== false) {
-        kids.push(kid);
-      }
+      const kid = { kidId: docSnap.id, ...docSnap.data() };
+      if (kid.active !== false) kids.push(kid);
     });
-
-    kids.sort((a, b) => a.kidId.localeCompare(b.kidId));
+    kids.sort((a,b) => String(a.name || a.kidId).localeCompare(String(b.name || b.kidId)));
 
     document.body.innerHTML = `
       <main class="app">
-        ${renderSignOutHeader(user)}
-
-        <header class="hero">
-          <div class="logo">🛡️</div>
-          <h1>Choose Your Character</h1>
-          <p>Select your profile to enter the realm.</p>
-        </header>
-
+        ${isParentUser(user) ? renderSignOutHeader(user) : ""}
+        <header class="hero"><div class="logo">🛡️</div><h1>Choose Your Character</h1><p>Select a profile to enter the realm.</p></header>
         <section class="character-select">
-          ${kids
-            .map(
-              kid => `
-                <button
-                  class="character-card-btn kid-select-btn"
-                  type="button"
-                  data-kid-id="${escapeAttribute(kid.kidId)}"
-                >
-                  <div class="avatar">${kid.avatar || "🧙"}</div>
-                  <strong>${escapeHtml(kid.name || kid.kidId)}</strong>
-                  <span>${escapeHtml(
-                    kid.classTitle || `Level ${kid.level || 1} Adventurer`
-                  )}</span>
-                </button>
-              `
-            )
-            .join("")}
+          ${kids.map(kid => `
+            <button class="character-card-btn kid-select-btn" type="button" data-kid-id="${escapeAttribute(kid.kidId)}">
+              <div class="avatar">${kid.avatar || "🧙"}</div>
+              <strong>${escapeHtml(kid.name || kid.kidId)}</strong>
+              <span>${escapeHtml(kid.classTitle || `Level ${kid.level || 1} Adventurer`)}</span>
+            </button>`).join("")}
         </section>
-      </main>
-    `;
+        <section class="card login-card" style="margin-top:18px;">
+          <h2>Parent Portal</h2>
+          ${isParentUser(user)
+            ? '<button id="openParentBtn" type="button">Open Guild Hall</button>'
+            : '<button id="googleSignInBtn" type="button">Parent Sign In with Google</button>'}
+        </section>
+      </main>`;
 
     attachSignOutEvent();
-
-    document.querySelectorAll(".kid-select-btn").forEach(button => {
-      button.addEventListener("click", () => {
-        loadKidDashboard(button.dataset.kidId);
+    document.querySelectorAll('.kid-select-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        window.history.pushState({}, document.title, `?kid=${encodeURIComponent(button.dataset.kidId)}`);
+        loadKidEntry(button.dataset.kidId);
       });
     });
+    document.getElementById('googleSignInBtn')?.addEventListener('click', startParentSignIn);
+    document.getElementById('openParentBtn')?.addEventListener('click', () => loadParentDashboard(auth.currentUser));
   } catch (err) {
-    showError("Could not load characters: " + err.message);
+    showError("Could not load profiles: " + err.message);
+  }
+}
+
+function isKidUnlocked(kidId) {
+  return sessionStorage.getItem(KID_UNLOCK_KEY) === kidId;
+}
+
+async function hashPin(pin) {
+  const bytes = new TextEncoder().encode(String(pin));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function loadKidEntry(kidId) {
+  if (isKidUnlocked(kidId)) {
+    await loadKidDashboard(kidId);
+    return;
+  }
+
+  try {
+    const kidSnap = await getDoc(doc(db, "kids", kidId));
+    if (!kidSnap.exists()) { showError("Profile not found: " + kidId); return; }
+    const kid = { kidId, ...kidSnap.data() };
+
+    document.body.innerHTML = `
+      <main class="app">
+        <header class="hero compact"><div class="logo">${kid.avatar || "🧙"}</div><h1>${escapeHtml(kid.name || kidId)}</h1><p>Enter your 4-digit PIN</p></header>
+        <section class="card form-card">
+          ${kid.pinHash ? `
+            <div class="form-field"><label for="kidPin">PIN</label><input id="kidPin" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off"></div>
+            <button id="unlockKidBtn" type="button">Enter the Realm</button>
+            <p id="pinMessage" aria-live="polite"></p>`
+          : '<p>This profile does not have a PIN yet. Ask a parent to set one in Family Accounts.</p>'}
+          <button id="backHomeBtn" type="button">← Choose Another Profile</button>
+        </section>
+      </main>`;
+
+    document.getElementById('backHomeBtn').addEventListener('click', () => {
+      window.history.pushState({}, document.title, window.location.pathname);
+      loadUserDashboard(auth.currentUser);
+    });
+
+    const unlock = async () => {
+      const input = document.getElementById('kidPin');
+      const message = document.getElementById('pinMessage');
+      const pin = input?.value.trim() || '';
+      if (!/^\d{4}$/.test(pin)) { message.textContent = 'Enter a 4-digit PIN.'; return; }
+      if (await hashPin(pin) !== kid.pinHash) { input.value = ''; message.textContent = 'That PIN is not correct.'; return; }
+      sessionStorage.setItem(KID_UNLOCK_KEY, kidId);
+      await loadKidDashboard(kidId);
+    };
+    document.getElementById('unlockKidBtn')?.addEventListener('click', unlock);
+    document.getElementById('kidPin')?.addEventListener('keydown', e => { if (e.key === 'Enter') unlock(); });
+  } catch (err) {
+    showError("Could not open profile: " + err.message);
   }
 }
 
@@ -205,6 +213,11 @@ async function loadUserDashboard(user) {
 ------------------------------------------------- */
 
 async function loadKidDashboard(kidId) {
+  if (!isKidUnlocked(kidId)) {
+    await loadKidEntry(kidId);
+    return;
+  }
+
   document.body.innerHTML = `
     <main class="app">
       <header class="hero">
@@ -343,6 +356,8 @@ function renderDashboard(kid, quests, sideQuests) {
   document
     .getElementById("switchCharacterBtn")
     .addEventListener("click", () => {
+      sessionStorage.removeItem(KID_UNLOCK_KEY);
+      window.history.pushState({}, document.title, window.location.pathname);
       loadUserDashboard(auth.currentUser);
     });
 }
@@ -686,6 +701,11 @@ function renderParentDashboard(data, user) {
           `
           : ""
       }
+
+      <a class="character parent-link" href="?family=true">
+        <div class="avatar">👨‍👩‍👧‍👦</div>
+        <div><strong>Family Accounts</strong><span>Create profiles and set or reset PINs</span></div>
+      </a>
     </main>
   `;
 
@@ -763,6 +783,113 @@ async function rejectQuest(logId) {
   } catch (err) {
     alert("Could not reject quest: " + err.message);
   }
+}
+
+/* -------------------------------------------------
+   FAMILY ACCOUNTS
+------------------------------------------------- */
+
+async function loadFamilyAccounts(user) {
+  if (!isParentUser(user)) { await loadUserDashboard(null); return; }
+  try {
+    const kidsSnap = await getDocs(collection(db, "kids"));
+    const kids = [];
+    kidsSnap.forEach(docSnap => kids.push({ kidId: docSnap.id, ...docSnap.data() }));
+    kids.sort((a,b) => a.kidId.localeCompare(b.kidId));
+    document.body.innerHTML = `
+      <main class="app">
+        ${renderSignOutHeader(user)}
+        <header class="hero compact"><div class="logo">👨‍👩‍👧‍👦</div><h1>Family Accounts</h1><p>Create profiles and manage child PINs.</p></header>
+        <section class="card">
+          ${kids.map(kid => `
+            <div class="quest">
+              <div class="quest-icon">${kid.avatar || "🧙"}</div>
+              <div class="quest-info"><strong>${escapeHtml(kid.name || kid.kidId)}</strong><span>${escapeHtml(kid.kidId)} • ${kid.pinHash ? 'PIN set' : 'PIN not set'}</span><small class="status ${kid.active === false ? 'status-pending' : 'status-ready'}">${kid.active === false ? 'Disabled' : 'Active'}</small></div>
+              <div class="parent-buttons">
+                <button class="set-pin-btn" type="button" data-kid-id="${escapeAttribute(kid.kidId)}">🔢 PIN</button>
+                <button class="toggle-kid-btn" type="button" data-kid-id="${escapeAttribute(kid.kidId)}" data-active="${kid.active !== false}">${kid.active === false ? 'Enable' : 'Disable'}</button>
+              </div>
+            </div>`).join('')}
+        </section>
+        <button id="newKidBtn" type="button" style="width:100%; margin-bottom:12px;">➕ Create Child Profile</button>
+        <button id="familyBackBtn" type="button" style="width:100%;">← Back to Guild Hall</button>
+      </main>`;
+    attachSignOutEvent();
+    document.querySelectorAll('.set-pin-btn').forEach(button => button.addEventListener('click', () => loadPinForm(button.dataset.kidId, user)));
+    document.querySelectorAll('.toggle-kid-btn').forEach(button => button.addEventListener('click', async () => {
+      await updateDoc(doc(db, 'kids', button.dataset.kidId), { active: button.dataset.active !== 'true' });
+      await loadFamilyAccounts(user);
+    }));
+    document.getElementById('newKidBtn').addEventListener('click', () => loadNewKidForm(user, kids));
+    document.getElementById('familyBackBtn').addEventListener('click', () => { window.history.pushState({}, document.title, window.location.pathname); loadParentDashboard(user); });
+  } catch (err) { showError('Family accounts error: ' + err.message); }
+}
+
+async function loadPinForm(kidId, user) {
+  const kidSnap = await getDoc(doc(db, 'kids', kidId));
+  if (!kidSnap.exists()) { showError('Profile not found.'); return; }
+  const kid = kidSnap.data();
+  document.body.innerHTML = `
+    <main class="app">${renderSignOutHeader(user)}
+      <header class="hero compact"><div class="logo">🔢</div><h1>Set PIN</h1><p>${escapeHtml(kid.name || kidId)}</p></header>
+      <section class="card form-card">
+        <div class="form-field"><label for="newPin">New 4-digit PIN</label><input id="newPin" type="password" inputmode="numeric" maxlength="4"></div>
+        <div class="form-field"><label for="confirmPin">Confirm PIN</label><input id="confirmPin" type="password" inputmode="numeric" maxlength="4"></div>
+        <button id="savePinBtn" type="button">Save PIN</button>
+        <button id="cancelPinBtn" type="button">Cancel</button>
+      </section>
+    </main>`;
+  attachSignOutEvent();
+  document.getElementById('savePinBtn').addEventListener('click', async () => {
+    const pin = document.getElementById('newPin').value.trim();
+    const confirm = document.getElementById('confirmPin').value.trim();
+    if (!/^\d{4}$/.test(pin)) { alert('PIN must be exactly 4 digits.'); return; }
+    if (pin !== confirm) { alert('The PINs do not match.'); return; }
+    await updateDoc(doc(db, 'kids', kidId), { pinHash: await hashPin(pin), pinUpdatedAt: new Date().toISOString() });
+    await loadFamilyAccounts(user);
+  });
+  document.getElementById('cancelPinBtn').addEventListener('click', () => loadFamilyAccounts(user));
+}
+
+function getNextKidId(kids) {
+  const max = kids.reduce((n,k) => Math.max(n, Number(String(k.kidId).replace(/\D/g,'')) || 0), 0);
+  return `K${String(max + 1).padStart(3, '0')}`;
+}
+
+function loadNewKidForm(user, kids) {
+  const suggestedId = getNextKidId(kids);
+  document.body.innerHTML = `
+    <main class="app">${renderSignOutHeader(user)}
+      <header class="hero compact"><div class="logo">➕</div><h1>New Child Profile</h1></header>
+      <section class="card form-card">
+        <div class="form-field"><label>Profile Code</label><input id="newKidId" value="${suggestedId}" maxlength="10"></div>
+        <div class="form-field"><label>Name</label><input id="newKidName"></div>
+        <div class="form-field"><label>Avatar Emoji</label><input id="newKidAvatar" value="🧙"></div>
+        <div class="form-field"><label>Class Title</label><input id="newKidClass" value="Adventurer"></div>
+        <div class="form-field"><label>4-digit PIN</label><input id="newKidPin" type="password" inputmode="numeric" maxlength="4"></div>
+        <button id="createKidBtn" type="button">Create Profile</button>
+        <button id="cancelKidBtn" type="button">Cancel</button>
+      </section>
+    </main>`;
+  attachSignOutEvent();
+  document.getElementById('createKidBtn').addEventListener('click', async () => {
+    const kidId = document.getElementById('newKidId').value.trim().toUpperCase();
+    const name = document.getElementById('newKidName').value.trim();
+    const pin = document.getElementById('newKidPin').value.trim();
+    if (!/^[A-Z0-9_-]{2,10}$/.test(kidId)) { alert('Use 2-10 letters or numbers for the profile code.'); return; }
+    if (!name) { alert('Enter a name.'); return; }
+    if (!/^\d{4}$/.test(pin)) { alert('PIN must be exactly 4 digits.'); return; }
+    const existing = await getDoc(doc(db, 'kids', kidId));
+    if (existing.exists()) { alert('That profile code already exists.'); return; }
+    await setDoc(doc(db, 'kids', kidId), {
+      name, avatar: document.getElementById('newKidAvatar').value.trim() || '🧙',
+      classTitle: document.getElementById('newKidClass').value.trim() || 'Adventurer',
+      classPath: '', level: 1, xp: 0, gold: 0, currentStreak: 0, lifetimeQuests: 0,
+      active: true, pinHash: await hashPin(pin), pinUpdatedAt: new Date().toISOString(), createdAt: new Date().toISOString()
+    });
+    await loadFamilyAccounts(user);
+  });
+  document.getElementById('cancelKidBtn').addEventListener('click', () => loadFamilyAccounts(user));
 }
 
 /* -------------------------------------------------
