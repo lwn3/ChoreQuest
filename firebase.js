@@ -8,6 +8,7 @@ import {
   setDoc,
   updateDoc,
   addDoc,
+  deleteDoc,
   query,
   where
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
@@ -46,6 +47,7 @@ window.ChoreQuestFirebase = {
   setDoc,
   updateDoc,
   addDoc,
+  deleteDoc,
   query,
   where,
   // 3. Expose them to app.js
