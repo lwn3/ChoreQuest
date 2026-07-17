@@ -8,79 +8,204 @@ const {
   getDocs,
   updateDoc,
   addDoc,
-  query,
-  where,
   auth,
   googleProvider,
-  signInWithRedirect,
+  signInWithPopup,
   getRedirectResult,
   signOut,
   onAuthStateChanged
 } = window.ChoreQuestFirebase;
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbwwtxIFj6BaOWinXmPV2BTgdsUdRvqpqtp_0bzoSJv2_C3E2PoHLbKRBj4oH-RPEAUy/exec';
+// Parent accounts
+const ADMIN_EMAIL = "lawrencewnelson3@gmail.com";
+const CO_PARENT_EMAIL = "anitanelson1987@gmail.com";
 
-// Hardcoded parent emails for security routing
-const ADMIN_EMAIL = 'lawrencewnelson3@gmail.com';
-const CO_PARENT_EMAIL = 'anitanelson1987@gmail.com';
+/* -------------------------------------------------
+   AUTHENTICATION AND ROUTING
+------------------------------------------------- */
 
 function initializeAuthRouter() {
-  const { onAuthStateChanged, auth } = window.ChoreQuestFirebase;
-
-  onAuthStateChanged(auth, async (user) => {
+  onAuthStateChanged(auth, async user => {
     if (!user) {
       renderLoginScreen();
       return;
     }
 
-    const email = user.email.toLowerCase();
+    const email = String(user.email || "").toLowerCase();
+    const params = new URLSearchParams(window.location.search);
+    const isManager = params.get("manager") === "true";
 
-    // ROUTE PARENTS AUTOMATICALLY TO BLUEPRINTS / GUILD MASTER INTERFACE
     if (email === ADMIN_EMAIL) {
-      loadQuestManager(user);
-      return;
-    }
-    
-    if (email === CO_PARENT_EMAIL) {
-      const params = new URLSearchParams(window.location.search);
-      const isManager = params.get('manager') === 'true';
-
       if (isManager) {
-        alert("Access Denied: Only the Guild Master can manage quest blueprints.");
-        window.history.replaceState({}, document.title, window.location.pathname);
+        await loadQuestManager(user);
+      } else {
+        await loadParentDashboard(user);
       }
-      loadUserDashboard(user);
       return;
     }
 
-    // Route Children
-    loadUserDashboard(user);
+    if (email === CO_PARENT_EMAIL) {
+      if (isManager) {
+        alert("Only the Guild Master can manage quest blueprints.");
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname
+        );
+      }
+
+      await loadParentDashboard(user);
+      return;
+    }
+
+    await loadUserDashboard(user);
   });
 }
-// --- CHARACTER SELECTION SCREEN ---
-async function loadUserDashboard(user) {
+
+function renderLoginScreen() {
+  if (document.getElementById("googleSignInBtn")) return;
+
   document.body.innerHTML = `
     <main class="app">
       <header class="hero">
-        <div class="logo">🛡️</div>
-        <h1>Choose Your Character</h1>
-        <p>Select your profile to enter the realm</p>
+        <div class="logo">⚔️</div>
+        <h1>ChoreQuest</h1>
+        <p>Complete quests. Earn XP. Unlock rewards.</p>
       </header>
-      <section class="character-select">
-        <button class="character-card-btn" onclick="loadKidDashboard('K001')">
-          <div class="avatar">🐺</div>
-          <strong>Autumn</strong>
-          <span>Level 1 Rogue</span>
-        </button>
-        <button class="character-card-btn" onclick="loadKidDashboard('K002')">
-          <div class="avatar">🦊</div>
-          <strong>Cammron</strong>
-          <span>Level 1 Warrior</span>
+
+      <section class="card login-card">
+        <h2>Enter the Realm</h2>
+        <button id="googleSignInBtn" class="btn-primary" type="button">
+          Sign In with Google
         </button>
       </section>
     </main>
   `;
+
+  document
+    .getElementById("googleSignInBtn")
+    .addEventListener("click", async () => {
+      try {
+        await signInWithPopup(auth, googleProvider);
+      } catch (err) {
+        showError("Sign in failed: " + err.message);
+      }
+    });
 }
+
+function renderSignOutHeader(user) {
+  if (!user) return "";
+
+  const displayName = user.displayName || user.email || "Signed in";
+
+  return `
+    <div class="account-header">
+      <span>${escapeHtml(displayName)}</span>
+      <button id="signOutBtn" type="button">Sign Out</button>
+    </div>
+  `;
+}
+
+function attachSignOutEvent() {
+  const button = document.getElementById("signOutBtn");
+  if (!button) return;
+
+  button.addEventListener("click", async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      alert("Sign out failed: " + err.message);
+    }
+  });
+}
+
+/* -------------------------------------------------
+   CHARACTER SELECTION
+------------------------------------------------- */
+
+async function loadUserDashboard(user) {
+  document.body.innerHTML = `
+    <main class="app">
+      ${renderSignOutHeader(user)}
+
+      <header class="hero">
+        <div class="logo">🛡️</div>
+        <h1>Choose Your Character</h1>
+        <p>Select your profile to enter the realm.</p>
+      </header>
+
+      <section class="card">
+        <p>Loading adventurers...</p>
+      </section>
+    </main>
+  `;
+
+  attachSignOutEvent();
+
+  try {
+    const kidsSnap = await getDocs(collection(db, "kids"));
+    const kids = [];
+
+    kidsSnap.forEach(docSnap => {
+      const kid = {
+        kidId: docSnap.id,
+        ...docSnap.data()
+      };
+
+      if (kid.active !== false) {
+        kids.push(kid);
+      }
+    });
+
+    kids.sort((a, b) => a.kidId.localeCompare(b.kidId));
+
+    document.body.innerHTML = `
+      <main class="app">
+        ${renderSignOutHeader(user)}
+
+        <header class="hero">
+          <div class="logo">🛡️</div>
+          <h1>Choose Your Character</h1>
+          <p>Select your profile to enter the realm.</p>
+        </header>
+
+        <section class="character-select">
+          ${kids
+            .map(
+              kid => `
+                <button
+                  class="character-card-btn kid-select-btn"
+                  type="button"
+                  data-kid-id="${escapeAttribute(kid.kidId)}"
+                >
+                  <div class="avatar">${kid.avatar || "🧙"}</div>
+                  <strong>${escapeHtml(kid.name || kid.kidId)}</strong>
+                  <span>${escapeHtml(
+                    kid.classTitle || `Level ${kid.level || 1} Adventurer`
+                  )}</span>
+                </button>
+              `
+            )
+            .join("")}
+        </section>
+      </main>
+    `;
+
+    attachSignOutEvent();
+
+    document.querySelectorAll(".kid-select-btn").forEach(button => {
+      button.addEventListener("click", () => {
+        loadKidDashboard(button.dataset.kidId);
+      });
+    });
+  } catch (err) {
+    showError("Could not load characters: " + err.message);
+  }
+}
+
+/* -------------------------------------------------
+   KID DASHBOARD
+------------------------------------------------- */
 
 async function loadKidDashboard(kidId) {
   document.body.innerHTML = `
@@ -94,22 +219,31 @@ async function loadKidDashboard(kidId) {
   `;
 
   try {
+    await resetDailyQuestsIfNeeded();
+
     const kidSnap = await getDoc(doc(db, "kids", kidId));
+
     if (!kidSnap.exists()) {
       showError("Kid not found: " + kidId);
       return;
     }
 
-    const kid = { kidId, ...kidSnap.data() };
+    const kid = {
+      kidId,
+      ...kidSnap.data()
+    };
+
     const questSnap = await getDocs(collection(db, "quests"));
-    await resetDailyQuestsIfNeeded();
-    
     const quests = [];
     const sideQuests = [];
 
     questSnap.forEach(docSnap => {
-      const quest = { choreId: docSnap.id, ...docSnap.data() };
-      if (!quest.active) return;
+      const quest = {
+        choreId: docSnap.id,
+        ...docSnap.data()
+      };
+
+      if (quest.active === false) return;
       if (quest.kidId !== kidId) return;
 
       if (quest.type === "bonus") {
@@ -133,16 +267,20 @@ function renderDashboard(kid, quests, sideQuests) {
 
   const xpNeeded = 100;
   const xpIntoLevel = xp % xpNeeded;
-  const progressPercent = Math.min(100, Math.round((xpIntoLevel / xpNeeded) * 100));
+  const progressPercent = Math.min(
+    100,
+    Math.round((xpIntoLevel / xpNeeded) * 100)
+  );
 
   document.body.innerHTML = `
     <main class="app">
       ${renderSignOutHeader(auth.currentUser)}
+
       <header class="hero compact">
-        <div class="logo">${kid.avatar}</div>
-        <h1>${kid.name}</h1>
-        <p>${kid.classTitle}</p>
-        <small class="class-path">${kid.classPath}</small>
+        <div class="logo">${kid.avatar || "🧙"}</div>
+        <h1>${escapeHtml(kid.name || kid.kidId)}</h1>
+        <p>${escapeHtml(kid.classTitle || "")}</p>
+        <small class="class-path">${escapeHtml(kid.classPath || "")}</small>
       </header>
 
       <section class="card character-card">
@@ -151,10 +289,12 @@ function renderDashboard(kid, quests, sideQuests) {
             <span class="label">Level</span>
             <strong>${level}</strong>
           </div>
+
           <div>
             <span class="label">Gold</span>
             <strong>${gold}</strong>
           </div>
+
           <div>
             <span class="label">Streak</span>
             <strong>${streak}🔥</strong>
@@ -165,31 +305,196 @@ function renderDashboard(kid, quests, sideQuests) {
           <div class="xp-fill" style="width:${progressPercent}%"></div>
         </div>
 
-        <p class="xp-text">${xpIntoLevel} / ${xpNeeded} XP to next level</p>
+        <p class="xp-text">
+          ${xpIntoLevel} / ${xpNeeded} XP to next level
+        </p>
       </section>
 
       <section class="card">
         <h2>⚔️ Daily Quests</h2>
-        ${quests.length === 0 ? '<p>No daily quests available right now.</p>' : quests.map(questCard).join('')}
+        ${
+          quests.length === 0
+            ? "<p>No daily quests available right now.</p>"
+            : quests.map(questCard).join("")
+        }
       </section>
 
       <section class="card side-card">
-        <h2>🗺 Side Quests</h2>
-        ${sideQuests.length === 0 ? '<p>No side quests available right now.</p>' : sideQuests.map(questCard).join('')}
+        <h2>🗺️ Side Quests</h2>
+        ${
+          sideQuests.length === 0
+            ? "<p>No side quests available right now.</p>"
+            : sideQuests.map(questCard).join("")
+        }
       </section>
+
+      <button id="switchCharacterBtn" type="button">
+        ← Switch Character
+      </button>
     </main>
   `;
-  
+
   attachSignOutEvent();
-  document.querySelectorAll('.complete-btn').forEach(button => {
-    button.addEventListener('click', () => {
-      completeQuest(button.dataset.type, button.dataset.choreId, kid.kidId);
+
+  document.querySelectorAll(".complete-btn").forEach(button => {
+    button.addEventListener("click", () => {
+      completeQuest(button.dataset.choreId, kid.kidId);
     });
   });
+
+  document
+    .getElementById("switchCharacterBtn")
+    .addEventListener("click", () => {
+      loadUserDashboard(auth.currentUser);
+    });
 }
 
+function questCard(quest) {
+  return `
+    <div class="quest">
+      <div class="quest-icon">
+        ${iconForQuest(quest.name || "")}
+      </div>
+
+      <div class="quest-info">
+        <strong>${escapeHtml(quest.name || "Unnamed Quest")}</strong>
+        <span>
+          ${escapeHtml(quest.time || "Anytime")}
+          • +${Number(quest.xp || 0)} XP
+          • +${Number(quest.gold || 0)} Gold
+        </span>
+
+        <small class="status ${statusClass(quest.status)}">
+          ${escapeHtml(statusLabel(quest.status))}
+        </small>
+      </div>
+
+      ${buttonForQuest(quest)}
+    </div>
+  `;
+}
+
+function buttonForQuest(quest) {
+  const status = quest.status || "Ready";
+
+  if (
+    status === "Ready" ||
+    status === "Not Started" ||
+    status === "Available" ||
+    status === "available"
+  ) {
+    return `
+      <button
+        class="complete-btn"
+        type="button"
+        data-chore-id="${escapeAttribute(quest.choreId)}"
+      >
+        Complete
+      </button>
+    `;
+  }
+
+  if (status === "Pending") {
+    return `<button class="disabled" disabled>Pending</button>`;
+  }
+
+  if (status === "Approved") {
+    return `<button class="approved" disabled>Done</button>`;
+  }
+
+  return `
+    <button class="disabled" disabled>
+      ${escapeHtml(status)}
+    </button>
+  `;
+}
+
+function statusLabel(status) {
+  if (!status) return "Ready";
+  if (status === "Not Started") return "Ready";
+  if (status === "Available" || status === "available") return "Ready";
+  if (status === "Pending") return "Awaiting approval";
+  if (status === "Approved") return "Completed";
+  return status;
+}
+
+function statusClass(status) {
+  if (status === "Pending") return "status-pending";
+  if (status === "Approved") return "status-approved";
+  return "status-ready";
+}
+
+function iconForQuest(name) {
+  const lower = String(name || "").toLowerCase();
+
+  if (lower.includes("zeus")) return "🐕";
+  if (lower.includes("cat")) return "🐈";
+  if (lower.includes("dish")) return "🍽️";
+  if (lower.includes("litter")) return "🧹";
+  if (lower.includes("garbage") || lower.includes("trash")) return "🗑️";
+  if (lower.includes("vacuum")) return "🧽";
+  if (lower.includes("laundry")) return "🧺";
+  if (lower.includes("room")) return "🛏️";
+
+  return "📜";
+}
+
+async function completeQuest(choreId, currentKidId) {
+  try {
+    await updateDoc(doc(db, "quests", choreId), {
+      status: "Pending",
+      completedBy: currentKidId
+    });
+
+    showToast(getCompletionMessage());
+
+    setTimeout(() => {
+      loadKidDashboard(currentKidId);
+    }, 700);
+  } catch (err) {
+    alert("Could not submit quest: " + err.message);
+  }
+}
+
+function getCompletionMessage() {
+  const kidName = document.querySelector("h1")?.textContent || "";
+
+  if (kidName === "Autumn") {
+    return "✨ Quest submitted with sparkles!";
+  }
+
+  if (kidName === "Cammron") {
+    return "🥊 Quest punched into review!";
+  }
+
+  return "Quest submitted for approval!";
+}
+
+function showToast(message) {
+  const oldToast = document.querySelector(".toast");
+  if (oldToast) oldToast.remove();
+
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.textContent = message;
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.remove();
+  }, 1800);
+}
+
+/* -------------------------------------------------
+   DAILY RESET
+------------------------------------------------- */
+
 function getTodayKey() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }
 
 async function resetDailyQuestsIfNeeded() {
@@ -199,6 +504,7 @@ async function resetDailyQuestsIfNeeded() {
 
   questSnap.forEach(docSnap => {
     const quest = docSnap.data();
+
     if (quest.type !== "daily") return;
     if (quest.lastResetDate === today) return;
 
@@ -210,82 +516,13 @@ async function resetDailyQuestsIfNeeded() {
       })
     );
   });
+
   await Promise.all(resets);
 }
 
-function questCard(quest) {
-  return `
-    <div class="quest">
-      <div class="quest-icon">${iconForQuest(quest.name)}</div>
-      <div class="quest-info">
-        <strong>${quest.name}</strong>
-        <span>${quest.time} • +${quest.gold} Gold</span>
-        <small class="status ${statusClass(quest.status)}">${statusLabel(quest.status)}</small>
-      </div>
-      ${buttonForQuest(quest)}
-    </div>
-  `;
-}
-
-function buttonForQuest(quest) {
-  if (quest.status === 'Ready' || quest.status === 'Not Started' || quest.status === 'Available') {
-    return `<button class="complete-btn" data-type="${quest.type}" data-chore-id="${quest.choreId}">Complete</button>`;
-  }
-  if (quest.status === 'Pending') return `<button class="disabled" disabled>Pending</button>`;
-  if (quest.status === 'Approved') return `<button class="approved" disabled>Done</button>`;
-  return `<button class="disabled" disabled>${quest.status}</button>`;
-}
-
-function statusLabel(status) {
-  if (status === 'Not Started') return 'Ready';
-  if (status === 'Available') return 'Available';
-  if (status === 'Pending') return 'Awaiting approval';
-  if (status === 'Approved') return 'Completed';
-  return status;
-}
-
-function statusClass(status) {
-  if (status === 'Pending') return 'status-pending';
-  if (status === 'Approved') return 'status-approved';
-  return 'status-ready';
-}
-
-function iconForQuest(name) {
-  const lower = name.toLowerCase();
-  if (lower.includes('zeus')) return '🐕';
-  if (lower.includes('cat')) return '🐈';
-  if (lower.includes('dish')) return '🍽️';
-  if (lower.includes('litter')) return '🧹';
-  if (lower.includes('garbage') || lower.includes('trash')) return '🗑️';
-  if (lower.includes('vacuum')) return '🧽';
-  return '📜';
-}
-
-async function completeQuest(type, choreId, currentKidId) {
-  try {
-    await updateDoc(doc(db, "quests", choreId), {
-      status: "Pending",
-      completedBy: currentKidId
-    });
-
-    showToast(getCompletionMessage());
-    setTimeout(() => { loadKidDashboard(currentKidId); }, 700);
-  } catch (err) {
-    alert("Could not submit quest: " + err.message);
-  }
-}
-
-function showToast(message) {
-  const oldToast = document.querySelector('.toast');
-  if (oldToast) oldToast.remove();
-
-  const toast = document.createElement('div');
-  toast.className = 'toast';
-  toast.textContent = message;
-  document.body.appendChild(toast);
-
-  setTimeout(() => { toast.remove(); }, 1800);
-}
+/* -------------------------------------------------
+   PARENT DASHBOARD
+------------------------------------------------- */
 
 async function loadParentDashboard(user) {
   document.body.innerHTML = `
@@ -299,30 +536,46 @@ async function loadParentDashboard(user) {
   `;
 
   try {
+    await resetDailyQuestsIfNeeded();
+
     const kidsSnap = await getDocs(collection(db, "kids"));
     const questSnap = await getDocs(collection(db, "quests"));
 
     const kids = [];
+
     kidsSnap.forEach(docSnap => {
-      kids.push({ kidId: docSnap.id, ...docSnap.data() });
+      kids.push({
+        kidId: docSnap.id,
+        ...docSnap.data()
+      });
     });
 
     const kidNames = {};
-    kids.forEach(k => { kidNames[k.kidId] = k.name; });
-    
-    await resetDailyQuestsIfNeeded();
+
+    kids.forEach(kid => {
+      kidNames[kid.kidId] = kid.name;
+    });
+
     const pending = [];
-    
+
     questSnap.forEach(docSnap => {
-      const quest = { choreId: docSnap.id, ...docSnap.data() };
-      if (quest.status === "Pending") {
-        pending.push({
-          logId: quest.choreId,
-          choreName: quest.name,
-          assignedKid: kidNames[quest.kidId] || quest.kidId,
-          completedBy: kidNames[quest.completedBy] || quest.completedBy || kidNames[quest.kidId] || quest.kidId
-        });
-      }
+      const quest = {
+        choreId: docSnap.id,
+        ...docSnap.data()
+      };
+
+      if (quest.status !== "Pending") return;
+
+      pending.push({
+        logId: quest.choreId,
+        choreName: quest.name,
+        assignedKid: kidNames[quest.kidId] || quest.kidId,
+        completedBy:
+          kidNames[quest.completedBy] ||
+          quest.completedBy ||
+          kidNames[quest.kidId] ||
+          quest.kidId
+      });
     });
 
     renderParentDashboard({ kids, pending }, user);
@@ -332,11 +585,13 @@ async function loadParentDashboard(user) {
 }
 
 function renderParentDashboard(data, user) {
-  const isGuildMaster = user.email.toLowerCase() === ADMIN_EMAIL;
+  const email = String(user?.email || "").toLowerCase();
+  const isGuildMaster = email === ADMIN_EMAIL;
 
   document.body.innerHTML = `
     <main class="app">
       ${renderSignOutHeader(user)}
+
       <header class="hero compact">
         <div class="logo">🛡️</div>
         <h1>Guild Hall</h1>
@@ -345,80 +600,138 @@ function renderParentDashboard(data, user) {
 
       <section class="card">
         <h2>Adventurers</h2>
-        ${data.kids.map(k => `
-          <div class="quest">
-            <div class="quest-icon">${k.kidId === 'K001' ? '🐺' : '🦊'}</div>
-            <div class="quest-info">
-              <strong>${k.name}</strong>
-              <span>Level ${k.level} • ${k.gold} Gold • ${k.currentStreak}🔥</span>
-              <small class="status status-ready">${k.lifetimeQuests || 0} lifetime quests</small>
-            </div>
-          </div>
-        `).join('')}
+
+        ${data.kids
+          .map(
+            kid => `
+              <div class="quest">
+                <div class="quest-icon">${kid.avatar || "🧙"}</div>
+
+                <div class="quest-info">
+                  <strong>${escapeHtml(kid.name || kid.kidId)}</strong>
+                  <span>
+                    Level ${Number(kid.level || 1)}
+                    • ${Number(kid.gold || 0)} Gold
+                    • ${Number(kid.currentStreak || 0)}🔥
+                  </span>
+
+                  <small class="status status-ready">
+                    ${Number(kid.lifetimeQuests || 0)} lifetime quests
+                  </small>
+                </div>
+              </div>
+            `
+          )
+          .join("")}
       </section>
 
       <section class="card">
         <h2>Quest Review</h2>
-        ${data.pending.length === 0 ? '<p>No quests pending approval.</p>' : data.pending.map(item => `
-              <div class="quest">
-                <div class="quest-icon">📜</div>
-                <div class="quest-info">
-                  <strong>${item.choreName}</strong>
-                  <span>Assigned: ${item.assignedKid}</span>
-                  <small class="status status-pending">Completed by ${item.completedBy}</small>
-                </div>
-                <div class="parent-buttons">
-                  <button onclick="approveQuest(&quot;${item.logId}&quot;)">✅</button>
-                  <button onclick="rejectQuest(&quot;${item.logId}&quot;)">❌</button>
-                </div>
+
+        ${
+          data.pending.length === 0
+            ? "<p>No quests pending approval.</p>"
+            : data.pending
+                .map(
+                  item => `
+                    <div class="quest">
+                      <div class="quest-icon">📜</div>
+
+                      <div class="quest-info">
+                        <strong>${escapeHtml(item.choreName)}</strong>
+                        <span>Assigned: ${escapeHtml(item.assignedKid)}</span>
+
+                        <small class="status status-pending">
+                          Completed by ${escapeHtml(item.completedBy)}
+                        </small>
+                      </div>
+
+                      <div class="parent-buttons">
+                        <button
+                          class="approve-quest-btn"
+                          type="button"
+                          data-log-id="${escapeAttribute(item.logId)}"
+                        >
+                          ✅
+                        </button>
+
+                        <button
+                          class="reject-quest-btn"
+                          type="button"
+                          data-log-id="${escapeAttribute(item.logId)}"
+                        >
+                          ❌
+                        </button>
+                      </div>
+                    </div>
+                  `
+                )
+                .join("")
+        }
+      </section>
+
+      ${
+        isGuildMaster
+          ? `
+            <a class="character parent-link" href="?manager=true">
+              <div class="avatar">📋</div>
+
+              <div>
+                <strong>Quest Manager</strong>
+                <span>View and manage blueprints</span>
               </div>
-            `).join('')}
-      </section>
-
-      ${isGuildMaster ? `
-        <a class="character parent-link" href="?manager=true">
-          <div class="avatar">📋</div>
-          <div>
-            <strong>Quest Manager</strong>
-            <span>View and manage blueprints</span>
-          </div>
-        </a>
-      ` : ''}
+            </a>
+          `
+          : ""
+      }
     </main>
   `;
+
   attachSignOutEvent();
-}
 
-function showError(message) {
-  document.body.innerHTML = `
-    <main class="app">
-      <section class="card">
-        <h2>Something went wrong</h2>
-        <p>${message}</p>
-        <button onclick="signOut(auth)">Reset Connection</button>
-      </section>
-    </main>
-  `;
+  document.querySelectorAll(".approve-quest-btn").forEach(button => {
+    button.addEventListener("click", () => {
+      approveQuest(button.dataset.logId);
+    });
+  });
+
+  document.querySelectorAll(".reject-quest-btn").forEach(button => {
+    button.addEventListener("click", () => {
+      rejectQuest(button.dataset.logId);
+    });
+  });
 }
 
 async function approveQuest(logId) {
   try {
     const questRef = doc(db, "quests", logId);
     const questSnap = await getDoc(questRef);
-    if (!questSnap.exists()) { return; }
+
+    if (!questSnap.exists()) {
+      alert("Quest not found.");
+      return;
+    }
 
     const quest = questSnap.data();
     const kidRef = doc(db, "kids", quest.kidId);
     const kidSnap = await getDoc(kidRef);
-    if (!kidSnap.exists()) { return; }
+
+    if (!kidSnap.exists()) {
+      alert("Kid not found.");
+      return;
+    }
 
     const kid = kidSnap.data();
-    await updateDoc(questRef, { status: "Approved", approvedAt: new Date().toISOString() });
 
     const oldLevel = Number(kid.level || 1);
     const newXp = Number(kid.xp || 0) + Number(quest.xp || 0);
     const newGold = Number(kid.gold || 0) + Number(quest.gold || 0);
     const newLevel = Math.floor(newXp / 100) + 1;
+
+    await updateDoc(questRef, {
+      status: "Approved",
+      approvedAt: new Date().toISOString()
+    });
 
     await updateDoc(kidRef, {
       xp: newXp,
@@ -430,45 +743,45 @@ async function approveQuest(logId) {
     if (newLevel > oldLevel) {
       alert(`${kid.name} leveled up to Level ${newLevel}! 🎉`);
     }
-    loadParentDashboard(auth.currentUser);
+
+    await loadParentDashboard(auth.currentUser);
   } catch (err) {
     alert("Could not approve quest: " + err.message);
   }
 }
-window.approveQuest = approveQuest;
 
-function rejectQuest(logId) {
-  parentAction('rejectQuest', logId);
-}
-window.rejectQuest = rejectQuest;
+async function rejectQuest(logId) {
+  try {
+    await updateDoc(doc(db, "quests", logId), {
+      status: "Ready",
+      completedBy: ""
+    });
 
-function parentAction(action, logId) {
-  const callbackName = 'parentAction_' + Date.now();
-  window[callbackName] = function(data) {
-    delete window[callbackName];
-    if (data.error) { alert('Error: ' + data.error); return; }
-    loadParentDashboard(auth.currentUser);
-  };
-
-  const script = document.createElement('script');
-  script.src = API_URL + '?action=' + action + '&logId=' + encodeURIComponent(logId) + '&callback=' + callbackName;
-  document.body.appendChild(script);
+    await loadParentDashboard(auth.currentUser);
+  } catch (err) {
+    alert("Could not reject quest: " + err.message);
+  }
 }
 
-function getCompletionMessage() {
-  const kidName = document.querySelector('h1')?.textContent || '';
-  if (kidName === 'Autumn') return '✨ Quest submitted with sparkles!';
-  if (kidName === 'Cammron') return '🥊 Quest punched into review!';
-  return 'Quest submitted for approval!';
-}
+/* -------------------------------------------------
+   QUEST MANAGER
+------------------------------------------------- */
 
 async function loadQuestManager(user) {
-  // Ensure strict enforcement in layout layer
-  if (user.email.toLowerCase() !== ADMIN_EMAIL) return;
+  const email = String(user?.email || "").toLowerCase();
+
+  if (email !== ADMIN_EMAIL) {
+    showError("Only the Guild Master can manage quest blueprints.");
+    return;
+  }
 
   document.body.innerHTML = `
     <main class="app">
-      <header class="hero compact"><div class="logo">📋</div><h1>Quest Manager</h1><p>Loading...</p></header>
+      <header class="hero compact">
+        <div class="logo">📋</div>
+        <h1>Quest Manager</h1>
+        <p>Loading blueprints...</p>
+      </header>
     </main>
   `;
 
@@ -477,46 +790,119 @@ async function loadQuestManager(user) {
     const questSnap = await getDocs(collection(db, "quests"));
 
     const kidNames = {};
-    kidsSnap.forEach(docSnap => { kidNames[docSnap.id] = docSnap.data().name; });
+
+    kidsSnap.forEach(docSnap => {
+      kidNames[docSnap.id] = docSnap.data().name;
+    });
 
     const quests = [];
-    questSnap.forEach(docSnap => { quests.push({ questId: docSnap.id, ...docSnap.data() }); });
+
+    questSnap.forEach(docSnap => {
+      quests.push({
+        questId: docSnap.id,
+        ...docSnap.data()
+      });
+    });
+
+    quests.sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""))
+    );
 
     document.body.innerHTML = `
       <main class="app">
         ${renderSignOutHeader(user)}
+
         <header class="hero compact">
           <div class="logo">📋</div>
           <h1>Quest Manager</h1>
-          <p>${quests.length} blueprints active</p>
+          <p>${quests.length} quest blueprints</p>
         </header>
+
         <section class="card">
-          ${quests.map(quest => `
-            <div class="quest">
-              <div class="quest-icon">${quest.type === 'daily' ? '⚔️' : '🗺️'}</div>
-              <div class="quest-info">
-                <strong>${quest.name}</strong>
-                <span>${quest.type === 'daily' ? 'Daily' : 'Side'} • ${quest.time || 'Anytime'}</span>
-                <small class="status status-ready">
-                  ${kidNames[quest.kidId] || quest.kidId} • +${quest.xp || 0} XP • +${quest.gold || 0} Gold
-                </small>
-                <div class="parent-buttons">
-                  <button class="edit-quest-btn" data-quest-id="${quest.questId}">✏️</button>
-                </div>
-              </div>
-            </div>
-          `).join('')}
+          ${
+            quests.length === 0
+              ? "<p>No quests have been created yet.</p>"
+              : quests
+                  .map(
+                    quest => `
+                      <div class="quest">
+                        <div class="quest-icon">
+                          ${quest.type === "daily" ? "⚔️" : "🗺️"}
+                        </div>
+
+                        <div class="quest-info">
+                          <strong>${escapeHtml(
+                            quest.name || "Unnamed Quest"
+                          )}</strong>
+
+                          <span>
+                            ${
+                              quest.type === "daily"
+                                ? "Daily Quest"
+                                : "Side Quest"
+                            }
+                            • ${escapeHtml(quest.time || "Anytime")}
+                          </span>
+
+                          <small class="status status-ready">
+                            ${escapeHtml(
+                              kidNames[quest.kidId] || quest.kidId || "Unassigned"
+                            )}
+                            • +${Number(quest.xp || 0)} XP
+                            • +${Number(quest.gold || 0)} Gold
+                          </small>
+                        </div>
+
+                        <div class="parent-buttons">
+                          <button
+                            class="edit-quest-btn"
+                            type="button"
+                            data-quest-id="${escapeAttribute(quest.questId)}"
+                          >
+                            ✏️
+                          </button>
+                        </div>
+                      </div>
+                    `
+                  )
+                  .join("")
+          }
         </section>
-        <button id="newQuestBtn" style="width:100%; margin-bottom:15px;">➕ New Quest Blueprint</button>
-        <a class="back-link" href="?parent=true">← Back to Guild Hall</a>
+
+        <button
+          id="newQuestBtn"
+          type="button"
+          style="width:100%; margin-bottom:15px;"
+        >
+          ➕ New Quest Blueprint
+        </button>
+
+        <button id="backToGuildHallBtn" type="button">
+          ← Back to Guild Hall
+        </button>
       </main>
     `;
-    
+
     attachSignOutEvent();
-    document.querySelectorAll('.edit-quest-btn').forEach(button => {
-      button.addEventListener('click', () => { loadEditQuestForm(button.dataset.questId); });
+
+    document.querySelectorAll(".edit-quest-btn").forEach(button => {
+      button.addEventListener("click", () => {
+        loadEditQuestForm(button.dataset.questId);
+      });
     });
-    document.getElementById('newQuestBtn').addEventListener('click', loadNewQuestForm);
+
+    document
+      .getElementById("newQuestBtn")
+      .addEventListener("click", () => {
+        loadNewQuestForm();
+      });
+
+    document
+      .getElementById("backToGuildHallBtn")
+      .addEventListener("click", () => {
+        window.history.pushState({}, document.title, window.location.pathname);
+        loadParentDashboard(auth.currentUser);
+      });
   } catch (err) {
     showError("Quest manager error: " + err.message);
   }
@@ -526,183 +912,317 @@ async function loadEditQuestForm(questId) {
   try {
     const questSnap = await getDoc(doc(db, "quests", questId));
     const kidsSnap = await getDocs(collection(db, "kids"));
-    if (!questSnap.exists()) return;
+
+    if (!questSnap.exists()) {
+      showError("Quest not found.");
+      return;
+    }
 
     const quest = questSnap.data();
     const kids = [];
-    kidsSnap.forEach(docSnap => { kids.push({ kidId: docSnap.id, ...docSnap.data() }); });
+
+    kidsSnap.forEach(docSnap => {
+      kids.push({
+        kidId: docSnap.id,
+        ...docSnap.data()
+      });
+    });
 
     document.body.innerHTML = `
       <main class="app">
-        <header class="hero compact"><div class="logo">✏️</div><h1>Edit Quest</h1></header>
-        <section class="card form-card">
-          <label>Quest Name</label><input id="questName" value="${quest.name || ''}">
-          <label>Assigned Adventurer</label>
-          <select id="questKid">
-            ${kids.map(k => `<option value="${k.kidId}" ${quest.kidId === k.kidId ? 'selected' : ''}>${k.name}</option>`).join('')}
-          </select>
-          <label>Type</label>
-          <select id="questType">
-            <option value="daily" ${quest.type === 'daily' ? 'selected' : ''}>Daily Quest</option>
-            <option value="bonus" ${quest.type === 'bonus' ? 'selected' : ''}>Side Quest</option>
-          </select>
-          <label>Timeframe</label><input id="questTime" value="${quest.time || 'Anytime'}">
-          <label>XP Reward</label><input id="questXp" type="number" value="${quest.xp || 0}">
-          <label>Gold Reward</label><input id="questGold" type="number" value="${quest.gold || 0}">
-          <button id="saveQuestBtn">Save Blueprint</button>
+        ${renderSignOutHeader(auth.currentUser)}
+
+        <header class="hero compact">
+          <div class="logo">✏️</div>
+          <h1>Edit Quest</h1>
+          <p>${escapeHtml(quest.name || "")}</p>
+        </header>
+
+        <section
+          class="card form-card"
+          style="display:flex; flex-direction:column; gap:12px;"
+        >
+          ${formField(
+            "Quest Name",
+            `<input
+              id="questName"
+              value="${escapeAttribute(quest.name || "")}"
+              style="width:100%; box-sizing:border-box; padding:10px;"
+            >`
+          )}
+
+          ${formField(
+            "Assigned Adventurer",
+            `
+              <select
+                id="questKid"
+                style="width:100%; box-sizing:border-box; padding:10px;"
+              >
+                ${kids
+                  .map(
+                    kid => `
+                      <option
+                        value="${escapeAttribute(kid.kidId)}"
+                        ${quest.kidId === kid.kidId ? "selected" : ""}
+                      >
+                        ${escapeHtml(kid.name || kid.kidId)}
+                      </option>
+                    `
+                  )
+                  .join("")}
+              </select>
+            `
+          )}
+
+          ${formField(
+            "Type",
+            `
+              <select
+                id="questType"
+                style="width:100%; box-sizing:border-box; padding:10px;"
+              >
+                <option
+                  value="daily"
+                  ${quest.type === "daily" ? "selected" : ""}
+                >
+                  Daily Quest
+                </option>
+
+                <option
+                  value="bonus"
+                  ${quest.type === "bonus" ? "selected" : ""}
+                >
+                  Side Quest
+                </option>
+              </select>
+            `
+          )}
+
+          ${formField(
+            "Timeframe",
+            `<input
+              id="questTime"
+              value="${escapeAttribute(quest.time || "Anytime")}"
+              style="width:100%; box-sizing:border-box; padding:10px;"
+            >`
+          )}
+
+          ${formField(
+            "XP Reward",
+            `<input
+              id="questXp"
+              type="number"
+              min="0"
+              value="${Number(quest.xp || 0)}"
+              style="width:100%; box-sizing:border-box; padding:10px;"
+            >`
+          )}
+
+          ${formField(
+            "Gold Reward",
+            `<input
+              id="questGold"
+              type="number"
+              min="0"
+              value="${Number(quest.gold || 0)}"
+              style="width:100%; box-sizing:border-box; padding:10px;"
+            >`
+          )}
+
+          ${formField(
+            "Helper Bonus",
+            `<input
+              id="questHelperBonus"
+              type="number"
+              min="0"
+              value="${Number(quest.helperBonus || 0)}"
+              style="width:100%; box-sizing:border-box; padding:10px;"
+            >`
+          )}
+
+          <label
+            style="display:flex; align-items:center; gap:8px;"
+          >
+            <input
+              id="questActive"
+              type="checkbox"
+              ${quest.active !== false ? "checked" : ""}
+            >
+            Active
+          </label>
+
+          <button id="saveQuestBtn" type="button">
+            Save Blueprint
+          </button>
         </section>
-        <a class="back-link" href="?manager=true">← Cancel</a>
+
+        <button id="cancelEditBtn" type="button">
+          ← Cancel
+        </button>
       </main>
     `;
 
-    document.getElementById('saveQuestBtn').addEventListener('click', async () => {
-      await updateDoc(doc(db, "quests", questId), {
-        name: document.getElementById('questName').value,
-        kidId: document.getElementById('questKid').value,
-        type: document.getElementById('questType').value,
-        time: document.getElementById('questTime').value,
-        xp: Number(document.getElementById('questXp').value || 0),
-        gold: Number(document.getElementById('questGold').value || 0)
+    attachSignOutEvent();
+
+    document
+      .getElementById("saveQuestBtn")
+      .addEventListener("click", async () => {
+        const name = document
+          .getElementById("questName")
+          .value.trim();
+
+        if (!name) {
+          alert("Please enter a quest name.");
+          return;
+        }
+
+        try {
+          await updateDoc(doc(db, "quests", questId), {
+            name,
+            kidId: document.getElementById("questKid").value,
+            type: document.getElementById("questType").value,
+            time:
+              document.getElementById("questTime").value.trim() ||
+              "Anytime",
+            xp: Number(
+              document.getElementById("questXp").value || 0
+            ),
+            gold: Number(
+              document.getElementById("questGold").value || 0
+            ),
+            helperBonus: Number(
+              document.getElementById("questHelperBonus").value || 0
+            ),
+            active: document.getElementById("questActive").checked
+          });
+
+          await loadQuestManager(auth.currentUser);
+        } catch (err) {
+          showError("Could not save quest: " + err.message);
+        }
       });
-      loadQuestManager(auth.currentUser);
-    });
+
+    document
+      .getElementById("cancelEditBtn")
+      .addEventListener("click", () => {
+        loadQuestManager(auth.currentUser);
+      });
   } catch (err) {
-    showError("Edit error: " + err.message);
+    showError("Edit quest error: " + err.message);
   }
 }
 
 async function loadNewQuestForm() {
+  try {
     const kidsSnap = await getDocs(collection(db, "kids"));
     const kids = [];
-    kidsSnap.forEach(docSnap => { kids.push({ kidId: docSnap.id, ...docSnap.data() }); });
+
+    kidsSnap.forEach(docSnap => {
+      kids.push({
+        kidId: docSnap.id,
+        ...docSnap.data()
+      });
+    });
 
     document.body.innerHTML = `
-        <main class="app">
-            <header class="hero compact"><div class="logo">➕</div><h1>New Quest</h1></header>
-            <section class="card">
-                <form id="newQuestForm">
-                    <label>Quest Name</label><input id="questName" required placeholder="Defeat the Laundry Dragon...">
-                    <label>Assign To</label>
-                    <select id="questKid" required>
-                        ${kids.map(k => `<option value="${k.kidId}">${k.name}</option>`).join('')}
-                    </select>
-                    <label>Type</label>
-                    <select id="questType">
-                        <option value="daily">Daily</option>
-                        <option value="weekly">Weekly</option>
-                        <option value="epic">Epic</option>
-                    </select>
-                    <label>Time Limit</label><input id="questTime" placeholder="Before bed, 1 hour, etc.">
-                    <label>XP Reward</label><input id="questXp" type="number" value="10">
-                    <label>Gold Reward</label><input id="questGold" type="number" value="5">
-                    <button type="submit">Create Quest Blueprint</button>
-                </form>
-            </section>
-            <a class="back-link" href="?manager=true">← Cancel</a>
-        </main>
-    `;
+      <main class="app">
+        ${renderSignOutHeader(auth.currentUser)}
 
-    document.getElementById('newQuestForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        try {
-            await addDoc(collection(db, "quests"), {
-                name: document.getElementById('questName').value,
-                kidId: document.getElementById('questKid').value,
-                type: document.getElementById('questType').value,
-                time: document.getElementById('questTime').value,
-                xp: Number(document.getElementById('questXp').value || 0),
-                gold: Number(document.getElementById('questGold').value || 0),
-                status: "available"
-            });
-            loadQuestManager(auth.currentUser);
-        } catch (err) {
-            showError("Error creating quest: " + err.message);
-        }
-    });
-}
-// --- AUTHENTICATION STATE CHECK ---
-function checkAuthState() {
-    const { onAuthStateChanged, auth } = window.ChoreQuestFirebase;
+        <header class="hero compact">
+          <div class="logo">➕</div>
+          <h1>New Quest</h1>
+          <p>Create a new chore quest.</p>
+        </header>
 
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            // Logged in! Head to the dashboard
-            loadQuestManager(user);
-        } else {
-            // Check if the login card already exists. If it does, do nothing!
-            // This prevents overwriting the screen while a redirect finishes landing.
-            if (document.getElementById('googleSignInBtn')) return;
+        <section
+          class="card form-card"
+          style="display:flex; flex-direction:column; gap:12px;"
+        >
+          ${formField(
+            "Quest Name",
+            `<input
+              id="questName"
+              placeholder="Defeat the Laundry Dragon..."
+              style="width:100%; box-sizing:border-box; padding:10px;"
+            >`
+          )}
 
-            document.body.innerHTML = `
-                <main class="app">
-                    <header class="hero">
-                        <div class="logo">⚔️</div>
-                        <h1>ChoreQuest</h1>
-                        <p>Complete quests. Earn XP. Unlock rewards.</p>
-                    </header>
-                    <section class="card login-card">
-                        <h2>Enter the Realm</h2>
-                        <button id="googleSignInBtn" class="btn-primary">Sign In with Google</button>
-                    </section>
-                </main>
-            `;
+          ${formField(
+            "Assign To",
+            `
+              <select
+                id="questKid"
+                style="width:100%; box-sizing:border-box; padding:10px;"
+              >
+                ${kids
+                  .map(
+                    kid => `
+                      <option value="${escapeAttribute(kid.kidId)}">
+                        ${escapeHtml(kid.name || kid.kidId)}
+                      </option>
+                    `
+                  )
+                  .join("")}
+              </select>
+            `
+          )}
 
-            document.getElementById('googleSignInBtn').addEventListener('click', () => {
-                const { signInWithPopup, googleProvider, auth } = window.ChoreQuestFirebase;
+          ${formField(
+            "Type",
+            `
+              <select
+                id="questType"
+                style="width:100%; box-sizing:border-box; padding:10px;"
+              >
+                <option value="daily">Daily Quest</option>
+                <option value="bonus">Side Quest</option>
+              </select>
+            `
+          )}
 
-                // Attempt standard popup auth now that the script environment is stable
-                signInWithPopup(auth, googleProvider)
-                    .then((result) => {
-                        // Force immediate load upon successful login
-                        loadQuestManager(result.user);
-                    })
-                    .catch((err) => {
-                        showError("Sign in failed: " + err.message);
-                    });
-            });
-        }
-    });
-}
+          ${formField(
+            "Timeframe",
+            `<input
+              id="questTime"
+              value="Anytime"
+              style="width:100%; box-sizing:border-box; padding:10px;"
+            >`
+          )}
 
-// --- INITIALIZATION ---
-document.addEventListener('DOMContentLoaded', async () => {
-    const { getRedirectResult, auth } = window.ChoreQuestFirebase;
+          ${formField(
+            "XP Reward",
+            `<input
+              id="questXp"
+              type="number"
+              min="0"
+              value="5"
+              style="width:100%; box-sizing:border-box; padding:10px;"
+            >`
+          )}
 
-    try {
-        if (getRedirectResult) {
-            await getRedirectResult(auth);
-        }
-    } catch (err) {
-        console.error("Redirect login failed:", err);
-    }
+          ${formField(
+            "Gold Reward",
+            `<input
+              id="questGold"
+              type="number"
+              min="0"
+              value="5"
+              style="width:100%; box-sizing:border-box; padding:10px;"
+            >`
+          )}
 
-    // Fire the router now that Firebase handles are stable and ready!
-    initializeAuthRouter();
-});
+          ${formField(
+            "Helper Bonus",
+            `<input
+              id="questHelperBonus"
+              type="number"
+              min="0"
+              value="3"
+              style="width:100%; box-sizing:border-box; padding:10px;"
+            >`
+          )}
 
-// Helper function to render a clean login state if needed
-function renderLoginScreen() {
-    if (document.getElementById('googleSignInBtn')) return;
-
-    document.body.innerHTML = `
-        <main class="app">
-            <header class="hero">
-                <div class="logo">⚔️</div>
-                <h1>ChoreQuest</h1>
-                <p>Complete quests. Earn XP. Unlock rewards.</p>
-            </header>
-            <section class="card login-card">
-                <h2>Enter the Realm</h2>
-                <button id="googleSignInBtn" class="btn-primary">Sign In with Google</button>
-            </section>
-        </main>
-    `;
-
-    document.getElementById('googleSignInBtn').addEventListener('click', () => {
-        const { signInWithPopup, googleProvider, auth } = window.ChoreQuestFirebase;
-        signInWithPopup(auth, googleProvider)
-            .catch((err) => {
-                alert("Sign in failed: " + err.message);
-            });
-    });
-}
+          <label
+            style="display:flex; align-items:center; gap:8px;"
+          >
+            <input id="questActive" type="checkbox"
