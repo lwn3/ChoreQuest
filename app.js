@@ -150,21 +150,42 @@ const ITEM_GRADES = {
 };
 
 const ITEM_TYPES = {
-  wizard_hat: { name: "Wizard Hat", slot: "head", icon: "🧙", bonuses: { wisdom: 1, luck: 1 } },
-  knight_helmet: { name: "Knight Helmet", slot: "head", icon: "🪖", bonuses: { strength: 1, courage: 1 } },
-  adventure_tunic: { name: "Adventure Tunic", slot: "body", icon: "🥋", bonuses: { courage: 1, kindness: 1 } },
-  guardian_armor: { name: "Guardian Armor", slot: "body", icon: "🛡️", bonuses: { strength: 1, kindness: 1 } },
-  swift_boots: { name: "Swift Boots", slot: "feet", icon: "👢", bonuses: { agility: 1, luck: 1 } },
-  royal_boots: { name: "Royal Boots", slot: "feet", icon: "🥾", bonuses: { courage: 1, luck: 1 } },
-  lucky_amulet: { name: "Lucky Amulet", slot: "accessory", icon: "📿", bonuses: { luck: 2 } },
-  heart_charm: { name: "Heart Charm", slot: "accessory", icon: "💖", bonuses: { kindness: 2 } },
-  hero_cape: { name: "Hero Cape", slot: "cape", icon: "🦸", bonuses: { courage: 2 } },
-  moon_cape: { name: "Moon Cape", slot: "cape", icon: "🌙", bonuses: { wisdom: 1, luck: 1 } },
-  wooden_wand: { name: "Wooden Wand", slot: "main_hand", icon: "🪄", bonuses: { wisdom: 2 } },
-  training_sword: { name: "Training Sword", slot: "main_hand", icon: "🗡️", bonuses: { strength: 2 } },
+  // --- WOOD TIER: MAIN HAND ---
+  wooden_sword: { name: "Wooden Sword", slot: "main_hand", icon: "🗡️", bonuses: { strength: 2 } },
+  stick: { name: "Stick", slot: "main_hand", icon: "🪵", bonuses: { wisdom: 1, luck: 1 } },
+  branch: { name: "Branch", slot: "main_hand", icon: "🌿", bonuses: { wisdom: 2 } },
+  wooden_bow: { name: "Wooden Bow", slot: "main_hand", icon: "🏹", bonuses: { agility: 2 } },
+  wooden_axe: { name: "Wooden Axe", slot: "main_hand", icon: "🪓", bonuses: { strength: 2, courage: 1 } },
+
+  // --- WOOD TIER: OFF HAND ---
   wooden_shield: { name: "Wooden Shield", slot: "off_hand", icon: "🛡️", bonuses: { strength: 1, courage: 1 } },
-  tiny_dragon: { name: "Tiny Dragon", slot: "companion", icon: "🐉", bonuses: { courage: 1, luck: 1 } },
-  baby_unicorn: { name: "Baby Unicorn", slot: "companion", icon: "🦄", bonuses: { kindness: 1, luck: 1 } }
+  wooden_tome: { name: "Wooden Tome", slot: "off_hand", icon: "📖", bonuses: { wisdom: 2 } },
+  carved_rune_slate: { name: "Carved Rune Slate", slot: "off_hand", icon: "🪨", bonuses: { wisdom: 1, kindness: 1 } },
+
+  // --- WOOD TIER: HEAD ---
+  bark_cap: { name: "Bark Cap", slot: "head", icon: "🍄", bonuses: { courage: 1 } },
+  wooden_helmet: { name: "Wooden Helmet", slot: "head", icon: "🪖", bonuses: { strength: 1, courage: 1 } },
+  wooden_circlet: { name: "Wooden Circlet", slot: "head", icon: "⭕", bonuses: { wisdom: 1 } },
+  wooden_hat: { name: "Wooden Hat", slot: "head", icon: "🎩", bonuses: { luck: 1 } },
+  wood_crown: { name: "Wood Crown", slot: "head", icon: "👑", bonuses: { courage: 1, luck: 1 } },
+
+  // --- WOOD TIER: BODY ---
+  wooden_tunic: { name: "Wooden Tunic", slot: "body", icon: "🥋", bonuses: { courage: 1, kindness: 1 } },
+  wooden_robes: { name: "Wooden Robes", slot: "body", icon: "👘", bonuses: { wisdom: 2 } },
+
+  // --- WOOD TIER: FEET ---
+  wooden_boots: { name: "Wooden Boots", slot: "feet", icon: "👢", bonuses: { strength: 1 } },
+  wooden_shoes: { name: "Wooden Shoes", slot: "feet", icon: "👞", bonuses: { agility: 1 } },
+  wooden_slippers: { name: "Wooden Slippers", slot: "feet", icon: "🥿", bonuses: { luck: 1, agility: 1 } },
+
+  // --- WOOD TIER: CAPE ---
+  leaf_cape: { name: "Leaf Cape", slot: "cape", icon: "🍂", bonuses: { agility: 1, courage: 1 } },
+
+  // --- WOOD TIER: ACCESSORY ---
+  wooden_medallion: { name: "Wooden Medallion", slot: "accessory", icon: "🪙", bonuses: { luck: 1 } },
+  acorn_pendant: { name: "Acorn Pendant", slot: "accessory", icon: "🌰", bonuses: { luck: 2 } },
+  twine_quiver: { name: "Twine Quiver", slot: "accessory", icon: "🧵", bonuses: { agility: 1 } },
+  willow_ring: { name: "Willow Ring", slot: "accessory", icon: "💍", bonuses: { kindness: 2 } }
 };
 
 const EQUIPMENT_SLOTS = {
