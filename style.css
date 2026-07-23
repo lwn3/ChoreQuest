@@ -894,3 +894,26 @@ button:disabled {
     animation-iteration-count: 1 !important;
   }
 }
+/* =========================================================
+   PAPER-DOLL AVATAR
+========================================================= */
+
+.paper-doll-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 700 / 900;
+  overflow: hidden;
+  border-radius: 26px; /* Matches your illustrated composite background */
+  background: linear-gradient(180deg, #202944, #111a33);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.paper-doll-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}

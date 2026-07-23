@@ -160,8 +160,9 @@ const ITEM_TYPES = {
   heart_charm: { name: "Heart Charm", slot: "accessory", icon: "💖", bonuses: { kindness: 2 } },
   hero_cape: { name: "Hero Cape", slot: "cape", icon: "🦸", bonuses: { courage: 2 } },
   moon_cape: { name: "Moon Cape", slot: "cape", icon: "🌙", bonuses: { wisdom: 1, luck: 1 } },
-  wooden_wand: { name: "Wooden Wand", slot: "tool", icon: "🪄", bonuses: { wisdom: 2 } },
-  training_sword: { name: "Training Sword", slot: "tool", icon: "🗡️", bonuses: { strength: 2 } },
+  wooden_wand: { name: "Wooden Wand", slot: "main_hand", icon: "🪄", bonuses: { wisdom: 2 } },
+  training_sword: { name: "Training Sword", slot: "main_hand", icon: "🗡️", bonuses: { strength: 2 } },
+  wooden_shield: { name: "Wooden Shield", slot: "off_hand", icon: "🛡️", bonuses: { strength: 1, courage: 1 } },
   tiny_dragon: { name: "Tiny Dragon", slot: "companion", icon: "🐉", bonuses: { courage: 1, luck: 1 } },
   baby_unicorn: { name: "Baby Unicorn", slot: "companion", icon: "🦄", bonuses: { kindness: 1, luck: 1 } }
 };
@@ -172,7 +173,8 @@ const EQUIPMENT_SLOTS = {
   feet: "Feet",
   accessory: "Accessory",
   cape: "Cape",
-  tool: "Weapon / Tool",
+  main_hand: "Main Hand",
+  off_hand: "Off Hand",
   companion: "Companion"
 };
 
@@ -244,269 +246,91 @@ function gradePalette(grade) {
   return palettes[grade] || palettes.copper;
 }
 
-function avatarLayerForItem(item) {
-  if (!item) return "";
+/* -------------------------------------------------
+   PNG PAPER-DOLL RENDERER
+------------------------------------------------- */
 
-  const palette = gradePalette(item.grade);
-  const label = escapeAttribute(item.name || "Equipped item");
+const AVATAR_LAYER_ORDER = {
+  cape: 10,
+  base: 20,
+  body: 30, // chest/body armor
+  feet: 40, // boots
+  accessory: 50,
+  head: 60,
+  off_hand: 70,
+  tool: 80, // main hand
+  companion: 90
+};
 
-  // Every item is drawn on the same 520 x 640 coordinate system as the mannequin.
-  // The character uses a relaxed three-quarter pose so both hands remain available.
+function renderPaperDollAvatar(kid, equipment) {
+  const bodyType = getAvatarBodyType(kid); // Returns "boy" or "girl"
+  const childName = String(kid.name || kid.displayName || "").trim().toLowerCase();
+  
+  // Wesley is explicitly left-handed, default others to right unless otherwise specified
+  const isLeftHanded = kid.handedness === "left" || childName === "wesley";
 
-  if (item.slot === "cape") {
-    return `<g aria-label="${label}" data-slot="cape" filter="url(#gearShadow)">
-      <path d="M190 190 C159 223 148 321 156 470 C181 505 210 510 238 492 L248 224 C225 216 207 205 190 190Z"
-        fill="url(#capeLeft-${item.grade})" stroke="${palette.dark}" stroke-width="5"/>
-      <path d="M286 191 C318 217 350 286 363 445 C340 485 310 501 278 492 L267 224 C276 216 281 204 286 191Z"
-        fill="url(#capeRight-${item.grade})" stroke="${palette.dark}" stroke-width="5"/>
-      <path d="M191 190 Q238 220 286 191" fill="none" stroke="${palette.light}" stroke-width="8" opacity=".7"/>
-      <path d="M170 250 Q180 372 173 454 M343 250 Q330 363 342 438" fill="none" stroke="${palette.light}" stroke-width="4" opacity=".35"/>
-    </g>`;
+  // Helper function to generate an image tag for a layer
+  const renderLayer = (src, zIndex, alt) => {
+    return `<img class="paper-doll-layer" src="${src}" alt="${escapeAttribute(alt)}" style="z-index: ${zIndex};">`;
+  };
+
+  let layersHtml = "";
+
+  // 1. Cape
+  if (equipment?.cape) {
+    layersHtml += renderLayer(`assets/equipment/${equipment.cape.grade}/${equipment.cape.itemType}.png`, AVATAR_LAYER_ORDER.cape, equipment.cape.name);
   }
 
-  if (item.slot === "body") {
-    const armor = item.itemType === "guardian_armor";
-    return armor
-      ? `<g aria-label="${label}" data-slot="body" filter="url(#gearShadow)">
-          <path d="M205 195 Q228 174 251 188 Q276 172 307 197 L320 327 Q284 360 235 349 Q207 345 190 323Z"
-            fill="url(#metal-${item.grade})" stroke="${palette.dark}" stroke-width="5"/>
-          <path d="M227 187 Q251 219 276 184" fill="none" stroke="${palette.light}" stroke-width="7"/>
-          <path d="M252 210 V343 M202 260 Q251 281 311 254" fill="none" stroke="${palette.dark}" stroke-width="5" opacity=".65"/>
-          <circle cx="254" cy="254" r="19" fill="${palette.light}" stroke="${palette.dark}" stroke-width="5"/>
-          <path d="M245 254 L252 262 L266 245" fill="none" stroke="${palette.dark}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-        </g>`
-      : `<g aria-label="${label}" data-slot="body" filter="url(#gearShadow)">
-          <path d="M205 194 Q227 176 251 188 Q276 174 306 197 L317 329 Q282 355 236 348 Q207 344 192 322Z"
-            fill="url(#cloth-${item.grade})" stroke="${palette.dark}" stroke-width="5"/>
-          <path d="M227 187 Q252 218 276 184" fill="none" stroke="${palette.light}" stroke-width="7"/>
-          <path d="M211 272 Q254 294 307 269" fill="none" stroke="${palette.light}" stroke-width="4" opacity=".55"/>
-          <path d="M252 210 V341" stroke="${palette.dark}" stroke-width="4" opacity=".45"/>
-        </g>`;
+  // 2. Transparent Base Mannequin
+  layersHtml += renderLayer(`assets/avatar/${bodyType}-base.png`, AVATAR_LAYER_ORDER.base, `${bodyType} base mannequin`);
+
+  // 3. Body Armor
+  if (equipment?.body) {
+    layersHtml += renderLayer(`assets/equipment/${equipment.body.grade}/${equipment.body.itemType}.png`, AVATAR_LAYER_ORDER.body, equipment.body.name);
   }
 
-  if (item.slot === "feet") {
-    return `<g aria-label="${label}" data-slot="feet" filter="url(#gearShadow)">
-      <path d="M210 434 C214 420 245 418 251 434 L247 522 C243 545 217 553 190 545 C178 538 183 525 195 513Z"
-        fill="url(#leather-${item.grade})" stroke="${palette.dark}" stroke-width="5"/>
-      <path d="M271 430 C279 418 309 420 315 436 L326 510 C347 522 348 540 330 547 C301 554 276 543 270 522Z"
-        fill="url(#leather-${item.grade})" stroke="${palette.dark}" stroke-width="5"/>
-      <path d="M203 450 Q229 462 249 449 M276 447 Q300 459 318 448" fill="none" stroke="${palette.light}" stroke-width="7" opacity=".75"/>
-      <path d="M188 522 Q219 537 247 518 M273 518 Q303 537 335 520" fill="none" stroke="${palette.dark}" stroke-width="8"/>
-      <path d="M214 473 H244 M279 471 H319" stroke="${palette.light}" stroke-width="4" opacity=".42"/>
-    </g>`;
+  // 4. Boots
+  if (equipment?.feet) {
+    layersHtml += renderLayer(`assets/equipment/${equipment.feet.grade}/${equipment.feet.itemType}.png`, AVATAR_LAYER_ORDER.feet, equipment.feet.name);
   }
 
-  if (item.slot === "accessory") {
-    const charmMarkup = item.itemType === "heart_charm"
-      ? `<path d="M255 264 C238 253 241 239 251 239 C256 239 259 242 261 246 C263 242 267 239 272 239 C282 239 285 253 268 264 L261 270Z" fill="${palette.dark}"/>`
-      : `<path d="M255 238 L268 253 L255 268 L242 253Z" fill="${palette.dark}"/>`;
-    return `<g aria-label="${label}" data-slot="accessory" filter="url(#gearShadow)">
-      <path d="M226 197 Q252 255 284 192" fill="none" stroke="${palette.light}" stroke-width="5"/>
-      <circle cx="255" cy="253" r="18" fill="url(#metal-${item.grade})" stroke="${palette.light}" stroke-width="4"/>
-      ${charmMarkup}
-    </g>`;
+  // 5. Accessory
+  if (equipment?.accessory) {
+    layersHtml += renderLayer(`assets/equipment/${equipment.accessory.grade}/${equipment.accessory.itemType}.png`, AVATAR_LAYER_ORDER.accessory, equipment.accessory.name);
   }
 
-  if (item.slot === "head") {
-    const isWizard = item.itemType === "wizard_hat";
-    return isWizard
-      ? `<g aria-label="${label}" data-slot="head" filter="url(#gearShadow)">
-          <path d="M241 -4 C266 13 286 40 291 70 C267 57 243 57 220 70 C225 40 231 14 241 -4Z"
-            fill="url(#cloth-${item.grade})" stroke="${palette.dark}" stroke-width="5"/>
-          <path d="M224 47 Q257 65 286 44" fill="none" stroke="${palette.light}" stroke-width="6" opacity=".5"/>
-          <path d="M183 79 C202 63 288 59 327 79 C338 85 335 98 322 102 C278 114 211 114 177 99 C166 94 170 84 183 79Z"
-            fill="url(#cloth-${item.grade})" stroke="${palette.dark}" stroke-width="5"/>
-          <path d="M185 85 Q252 103 324 82" fill="none" stroke="${palette.light}" stroke-width="4" opacity=".42"/>
-        </g>`
-      : `<g aria-label="${label}" data-slot="head" filter="url(#gearShadow)">
-          <path d="M199 88 C201 46 308 42 316 87 L300 106 C270 115 225 112 195 100Z"
-            fill="url(#metal-${item.grade})" stroke="${palette.dark}" stroke-width="5"/>
-          <path d="M258 49 V106" stroke="${palette.light}" stroke-width="6" opacity=".7"/>
-          <path d="M205 90 Q254 105 308 87" fill="none" stroke="${palette.dark}" stroke-width="6"/>
-          <path d="M203 95 L192 132 M307 91 L319 126" stroke="${palette.main}" stroke-width="13" stroke-linecap="round"/>
-        </g>`;
+  // 6. Headwear
+  if (equipment?.head) {
+    layersHtml += renderLayer(`assets/equipment/${equipment.head.grade}/${equipment.head.itemType}.png`, AVATAR_LAYER_ORDER.head, equipment.head.name);
   }
 
-  if (item.slot === "tool") {
-    const wand = item.itemType === "wooden_wand";
-    return wand
-      ? `<g aria-label="${label}" data-slot="tool" filter="url(#gearShadow)">
-          <g transform="rotate(-18 437 292)">
-            <rect x="432" y="193" width="11" height="124" rx="5" fill="${palette.dark}"/>
-            <circle cx="438" cy="182" r="15" fill="url(#metal-${item.grade})" stroke="${palette.light}" stroke-width="5"/>
-            <path d="M438 151 L445 170 L465 170 L449 181 L455 201 L438 189 L421 201 L427 181 L411 170 L431 170Z" fill="${palette.light}"/>
-          </g>
-        </g>`
-      : `<g aria-label="${label}" data-slot="tool" filter="url(#gearShadow)">
-          <g transform="rotate(18 435 304)">
-            <rect x="429" y="290" width="13" height="54" rx="6" fill="${palette.dark}"/>
-            <circle cx="435" cy="338" r="8" fill="${palette.main}" stroke="${palette.light}" stroke-width="3"/>
-            <rect x="405" y="281" width="61" height="12" rx="6" fill="${palette.main}" stroke="${palette.light}" stroke-width="3"/>
-            <path d="M435 282 L419 130 L435 92 L451 130Z" fill="url(#metal-${item.grade})" stroke="${palette.dark}" stroke-width="5"/>
-            <path d="M435 110 V270" stroke="white" stroke-width="4" opacity=".55"/>
-          </g>
-        </g>`;
+// 7. Off Hand (Shields, spellbooks)
+  if (equipment?.off_hand) {
+    const handedSuffix = isLeftHanded ? "-left" : "";
+    layersHtml += renderLayer(`assets/equipment/${equipment.off_hand.grade}/${equipment.off_hand.itemType}${handedSuffix}.png`, AVATAR_LAYER_ORDER.off_hand, equipment.off_hand.name);
   }
 
-  if (item.slot === "companion") {
-    return `<g aria-label="${label}" data-slot="companion" filter="url(#gearShadow)">
-      <ellipse cx="447" cy="488" rx="43" ry="38" fill="url(#cloth-${item.grade})" stroke="${palette.light}" stroke-width="5"/>
-      <text x="447" y="502" text-anchor="middle" font-size="43">${itemIcon(item)}</text>
-    </g>`;
+  // 8. Main Hand (Swords, wands)
+  if (equipment?.main_hand) {
+    const handedSuffix = isLeftHanded ? "-left" : "";
+    layersHtml += renderLayer(`assets/equipment/${equipment.main_hand.grade}/${equipment.main_hand.itemType}${handedSuffix}.png`, AVATAR_LAYER_ORDER.main_hand, equipment.main_hand.name);
+  }
+    // 9. Companion
+  if (equipment?.companion) {
+    layersHtml += renderLayer(`assets/equipment/${equipment.companion.grade}/${equipment.companion.itemType}.png`, AVATAR_LAYER_ORDER.companion, equipment.companion.name);
   }
 
-  return "";
-}
-
-function renderVectorLayeredAvatar(kid, equipment) {
-  const skin = kid.avatarSkinColor || "#efb17e";
-  const skinLight = "#ffd0a5";
-  const skinShadow = "#cf8355";
-  const hair = kid.avatarHairColor || "#5b3525";
-  const hairLight = "#8a5635";
+  // Determine external glow effect based on highest tier equipped
   const hasMythril = Object.values(equipment || {}).some(item => item?.grade === "mythril");
   const glow = hasMythril
     ? "drop-shadow(0 0 20px rgba(109,216,232,.52))"
-    : "drop-shadow(0 18px 28px rgba(0,0,0,.34))";
-  const childName = String(kid.name || kid.displayName || "").trim().toLowerCase();
-  const handedness = kid.handedness || (childName === "wesley" ? "left" : "right");
-  const mirrorTransform = handedness === "left" ? "translate(520 0) scale(-1 1)" : "";
-
-  const equippedGrades = [...new Set(Object.values(equipment || {}).map(item => item?.grade).filter(Boolean))];
-  const gradientGrades = [...new Set(["copper", "iron", "silver", "gold", "mythril", ...equippedGrades])];
-  const gradientDefs = gradientGrades.map(grade => {
-    const p = gradePalette(grade);
-    return `
-      <linearGradient id="metal-${grade}" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="${p.light}"/><stop offset=".48" stop-color="${p.main}"/><stop offset="1" stop-color="${p.dark}"/>
-      </linearGradient>
-      <linearGradient id="cloth-${grade}" x1="0" y1="0" x2=".9" y2="1">
-        <stop offset="0" stop-color="${p.light}"/><stop offset=".32" stop-color="${p.main}"/><stop offset="1" stop-color="${p.dark}"/>
-      </linearGradient>
-      <linearGradient id="leather-${grade}" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="${p.light}"/><stop offset=".28" stop-color="${p.main}"/><stop offset="1" stop-color="${p.dark}"/>
-      </linearGradient>
-      <linearGradient id="capeLeft-${grade}" x1="0" y1="0" x2="1" y2=".2">
-        <stop offset="0" stop-color="${p.dark}"/><stop offset=".55" stop-color="${p.main}"/><stop offset="1" stop-color="${p.light}"/>
-      </linearGradient>
-      <linearGradient id="capeRight-${grade}" x1="0" y1="0" x2="1" y2=".2">
-        <stop offset="0" stop-color="${p.light}"/><stop offset=".45" stop-color="${p.main}"/><stop offset="1" stop-color="${p.dark}"/>
-      </linearGradient>`;
-  }).join("");
+    : "drop-shadow(0 18px 35px rgba(0,0,0,.45))";
 
   return `
-    <div aria-label="Illustrated layered character avatar" style="width:min(100%,420px);margin:4px auto 0;filter:${glow};">
-      <svg viewBox="0 0 520 640" role="img" aria-label="Relaxed three-quarter character wearing equipped items" style="display:block;width:100%;height:auto;overflow:visible;">
-        <defs>
-          <filter id="gearShadow" x="-35%" y="-35%" width="170%" height="170%">
-            <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#000" flood-opacity=".38"/>
-          </filter>
-          <filter id="bodyShadow" x="-35%" y="-35%" width="170%" height="170%">
-            <feDropShadow dx="0" dy="8" stdDeviation="7" flood-color="#000" flood-opacity=".28"/>
-          </filter>
-          <linearGradient id="skinBase" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="${skinLight}"/><stop offset=".5" stop-color="${skin}"/><stop offset="1" stop-color="${skinShadow}"/>
-          </linearGradient>
-          <linearGradient id="tankTop" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#f6f7fb"/><stop offset="1" stop-color="#cfd5df"/>
-          </linearGradient>
-          <linearGradient id="hairBase" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="${hairLight}"/><stop offset=".5" stop-color="${hair}"/><stop offset="1" stop-color="#321d17"/>
-          </linearGradient>
-          ${gradientDefs}
-        </defs>
-
-        <g${mirrorTransform ? ` transform="${mirrorTransform}"` : ""}>
-          ${avatarLayerForItem(equipment?.cape)}
-
-          <g data-layer="base-mannequin" filter="url(#bodyShadow)">
-            <!-- rear leg for three-quarter stance -->
-            <path d="M267 345 C286 342 302 352 306 374 L314 493 C313 517 297 529 279 522 L261 385 C257 363 257 350 267 345Z"
-              fill="url(#skinBase)" stroke="${skinShadow}" stroke-width="3"/>
-            <path d="M282 500 C306 499 332 511 338 528 C342 541 327 548 302 546 C277 545 263 538 265 525Z"
-              fill="url(#skinBase)" stroke="${skinShadow}" stroke-width="3"/>
-
-            <!-- front leg -->
-            <path d="M222 345 C241 342 258 351 260 375 L251 501 C248 520 232 530 214 521 L203 383 C201 362 207 350 222 345Z"
-              fill="url(#skinBase)" stroke="${skinShadow}" stroke-width="3"/>
-            <path d="M217 500 C239 503 253 514 254 529 C254 541 238 547 211 545 C186 543 174 535 181 522 C189 508 199 501 217 500Z"
-              fill="url(#skinBase)" stroke="${skinShadow}" stroke-width="3"/>
-
-            <!-- neck -->
-            <path d="M231 164 C231 184 236 195 251 199 C268 198 278 184 276 163Z"
-              fill="url(#skinBase)" stroke="${skinShadow}" stroke-width="3"/>
-
-            <!-- relaxed off-hand arm, held away from body -->
-            <path d="M201 207 C181 204 169 215 165 235 L148 329 C146 349 155 364 170 367 C185 369 194 357 194 340 L210 248 C214 224 212 211 201 207Z"
-              fill="url(#skinBase)" stroke="${skinShadow}" stroke-width="3"/>
-            <path d="M158 345 C148 360 150 382 165 391 C179 400 194 389 194 370 C192 352 180 341 158 345Z"
-              fill="url(#skinBase)" stroke="${skinShadow}" stroke-width="3"/>
-            <path d="M163 370 Q174 378 187 369" fill="none" stroke="${skinShadow}" stroke-width="3" opacity=".6"/>
-
-            <!-- main-hand arm angled outward -->
-            <path d="M304 207 C324 202 340 211 349 229 L382 271 C395 286 397 300 387 309 C376 319 362 313 350 301 L311 260 C295 241 292 216 304 207Z"
-              fill="url(#skinBase)" stroke="${skinShadow}" stroke-width="3"/>
-            <path d="M381 271 C398 270 420 283 434 299 C443 310 442 324 432 332 C420 340 408 333 398 321 L376 305 C364 294 367 276 381 271Z"
-              fill="url(#skinBase)" stroke="${skinShadow}" stroke-width="3"/>
-            <path d="M410 306 Q420 310 431 305" fill="none" stroke="${skinShadow}" stroke-width="3" opacity=".55"/>
-
-            <!-- fitted tank top painted into the mannequin -->
-            <path d="M205 197 Q226 179 238 191 Q251 204 264 190 Q279 178 305 199 L314 327 Q286 351 250 350 Q219 350 194 326Z"
-              fill="url(#tankTop)" stroke="#d5dae4" stroke-width="4"/>
-            <path d="M229 190 Q251 221 275 188" fill="none" stroke="#c7ccd7" stroke-width="5"/>
-            <path d="M204 255 Q250 274 309 250" fill="none" stroke="#ffffff" stroke-width="5" opacity=".45"/>
-            <path d="M205 312 Q252 329 309 307" fill="none" stroke="#bdc4d0" stroke-width="3" opacity=".45"/>
-
-            <!-- fitted briefs painted into the mannequin -->
-            <path d="M196 323 Q251 343 316 321 L306 376 Q280 389 258 371 L246 358 L233 374 Q215 389 202 373Z"
-              fill="url(#tankTop)" stroke="#cfd5df" stroke-width="4"/>
-            <path d="M205 337 Q253 354 307 335" fill="none" stroke="#bfc6d2" stroke-width="3"/>
-            <path d="M246 352 V374" stroke="#c3cad6" stroke-width="3"/>
-
-            <!-- face and ears -->
-            <ellipse cx="250" cy="115" rx="69" ry="73" fill="url(#skinBase)" stroke="${skinShadow}" stroke-width="3"/>
-            <ellipse cx="184" cy="121" rx="15" ry="22" fill="url(#skinBase)" stroke="${skinShadow}" stroke-width="3"/>
-            <ellipse cx="313" cy="116" rx="14" ry="21" fill="url(#skinBase)" stroke="${skinShadow}" stroke-width="3"/>
-
-            <!-- illustrated hair -->
-            <path d="M183 108 C181 61 208 35 253 38 C292 39 316 62 318 102 C303 84 288 73 273 68 C266 84 248 93 228 88 C213 105 199 111 183 108Z"
-              fill="url(#hairBase)" stroke="#392119" stroke-width="4"/>
-            <path d="M207 55 Q237 43 263 54 M279 58 Q300 70 307 89" fill="none" stroke="${hairLight}" stroke-width="7" opacity=".55" stroke-linecap="round"/>
-            <path d="M220 78 Q234 100 255 83 Q269 94 283 75" fill="url(#hairBase)"/>
-
-            <!-- expressive face -->
-            <path d="M207 110 Q223 101 238 109" fill="none" stroke="#4a2a22" stroke-width="5" stroke-linecap="round"/>
-            <path d="M264 106 Q280 98 294 107" fill="none" stroke="#4a2a22" stroke-width="5" stroke-linecap="round"/>
-            <ellipse cx="225" cy="122" rx="10" ry="13" fill="#ffffff"/>
-            <ellipse cx="280" cy="118" rx="10" ry="13" fill="#ffffff"/>
-            <ellipse cx="228" cy="123" rx="5" ry="8" fill="#2d201c"/>
-            <ellipse cx="282" cy="119" rx="5" ry="8" fill="#2d201c"/>
-            <circle cx="230" cy="120" r="2" fill="#ffffff"/>
-            <circle cx="284" cy="116" r="2" fill="#ffffff"/>
-            <path d="M255 122 Q260 137 251 141" fill="none" stroke="${skinShadow}" stroke-width="3" stroke-linecap="round"/>
-            <path d="M229 151 Q251 167 276 148" fill="none" stroke="#8f4b42" stroke-width="4" stroke-linecap="round"/>
-            <path d="M205 145 Q214 151 222 145 M286 141 Q296 146 303 139" fill="none" stroke="#e99a7c" stroke-width="3" opacity=".55"/>
-
-            <!-- subtle anatomy and fabric highlights -->
-            <path d="M177 235 Q190 246 201 239 M321 230 Q334 242 344 238" fill="none" stroke="${skinLight}" stroke-width="5" opacity=".42" stroke-linecap="round"/>
-            <path d="M218 398 Q232 408 247 400 M273 396 Q290 407 304 397" fill="none" stroke="${skinLight}" stroke-width="5" opacity=".36" stroke-linecap="round"/>
-          </g>
-
-          ${avatarLayerForItem(equipment?.body)}
-          ${avatarLayerForItem(equipment?.accessory)}
-          ${avatarLayerForItem(equipment?.head)}
-          ${avatarLayerForItem(equipment?.feet)}
-          ${avatarLayerForItem(equipment?.tool)}
-
-          <!-- Fingers over the equipped main-hand grip -->
-          ${equipment?.tool ? `<g filter="url(#gearShadow)">
-            <path d="M420 295 Q434 293 441 304 Q447 316 438 326 Q427 334 417 325 Q410 315 420 295Z" fill="url(#skinBase)" stroke="${skinShadow}" stroke-width="3"/>
-            <path d="M420 305 Q431 310 440 305 M420 314 Q431 319 440 314" fill="none" stroke="${skinShadow}" stroke-width="2.5" opacity=".6"/>
-          </g>` : ""}
-
-          ${avatarLayerForItem(equipment?.companion)}
-        </g>
-      </svg>
+    <div aria-label="Illustrated layered character avatar" style="width:min(100%, 440px); margin:8px auto 0; filter:${glow};">
+      <div class="paper-doll-container">
+        ${layersHtml}
+      </div>
     </div>`;
 }
 
@@ -533,11 +357,10 @@ function hasIllustratedStarterLoadout(equipment) {
     feet: "swift_boots",
     accessory: "lucky_amulet",
     cape: "hero_cape",
-    tool: "training_sword"
+    main_hand: "training_sword"
   };
   return Object.entries(required).every(([slot, itemType]) => equipment?.[slot]?.itemType === itemType);
 }
-
 function renderIllustratedCompositeAvatar(kid) {
   const bodyType = getAvatarBodyType(kid);
   const asset = ILLUSTRATED_AVATAR_ASSETS[bodyType] || ILLUSTRATED_AVATAR_ASSETS.boy;
@@ -555,10 +378,13 @@ function renderIllustratedCompositeAvatar(kid) {
 }
 
 function renderLayeredAvatar(kid, equipment) {
+  // If they have the exact starter layout, we can still use the hardcoded composite if you want
   if (hasIllustratedStarterLoadout(equipment)) {
     return renderIllustratedCompositeAvatar(kid);
   }
-  return renderVectorLayeredAvatar(kid, equipment);
+  
+  // Otherwise, use the new PNG layer stacking system
+  return renderPaperDollAvatar(kid, equipment);
 }
 
 function isParentUser(user) {
