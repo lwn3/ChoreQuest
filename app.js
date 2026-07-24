@@ -142,7 +142,8 @@ const STAT_KEYS = ["strength", "wisdom", "agility", "kindness", "luck", "courage
 
 
 const ITEM_GRADES = {
-  copper: { name: "Copper", tradeValue: 1, multiplier: 1, color: "#b87333", glow: "rgba(184,115,51,.35)" },
+  wood: { name: "Wood", tradeValue: 1, multiplier: 1, color: "#a8753f", glow: "rgba(168,117,63,.35)" },
+  copper: { name: "Copper", tradeValue: 2, multiplier: 2, color: "#b87333", glow: "rgba(184,115,51,.35)" },
   iron: { name: "Iron", tradeValue: 2, multiplier: 2, color: "#8b949e", glow: "rgba(139,148,158,.35)" },
   silver: { name: "Silver", tradeValue: 4, multiplier: 3, color: "#d7e1ea", glow: "rgba(215,225,234,.4)" },
   gold: { name: "Gold", tradeValue: 8, multiplier: 5, color: "#f6c945", glow: "rgba(246,201,69,.45)" },
@@ -199,13 +200,13 @@ const EQUIPMENT_SLOTS = {
   companion: "Companion"
 };
 
-function createItem(itemType, grade = "copper") {
+function createItem(itemType, grade = "wood") {
   const def = ITEM_TYPES[itemType];
   const gradeDef = ITEM_GRADES[grade] || ITEM_GRADES.copper;
   return {
     instanceId: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     itemType,
-    name: `${gradeDef.name} ${def.name}`,
+    name: grade === "wood" ? def.name : `${gradeDef.name} ${def.name}`,
     slot: def.slot,
     grade,
     tradeValue: gradeDef.tradeValue,
@@ -217,11 +218,12 @@ function createItem(itemType, grade = "copper") {
 
 function starterInventory() {
   return [
-    createItem("wizard_hat", "copper"),
-    createItem("swift_boots", "iron"),
-    createItem("lucky_amulet", "silver"),
-    createItem("hero_cape", "copper"),
-    createItem("training_sword", "copper")
+    createItem("wooden_sword", "wood"),
+    createItem("wooden_shield", "wood"),
+    createItem("bark_cap", "wood"),
+    createItem("wooden_tunic", "wood"),
+    createItem("wooden_boots", "wood"),
+    createItem("leaf_cape", "wood")
   ];
 }
 
@@ -258,6 +260,7 @@ function itemIcon(item) {
 
 function gradePalette(grade) {
   const palettes = {
+    wood: { main: "#a8753f", light: "#d5aa72", dark: "#62401f", glow: "rgba(168,117,63,.35)" },
     copper: { main: "#b87333", light: "#e3a56a", dark: "#74421f", glow: "rgba(184,115,51,.35)" },
     iron: { main: "#727b86", light: "#b9c0c8", dark: "#3e4650", glow: "rgba(185,192,200,.3)" },
     silver: { main: "#c9d5e3", light: "#f3f7ff", dark: "#74859a", glow: "rgba(201,213,227,.4)" },
@@ -268,97 +271,8 @@ function gradePalette(grade) {
 }
 
 /* -------------------------------------------------
-   PNG PAPER-DOLL RENDERER
+   STATIC CHARACTER PORTRAIT
 ------------------------------------------------- */
-
-const AVATAR_LAYER_ORDER = {
-  cape: 10,
-  base: 20,
-  body: 30, // chest/body armor
-  feet: 40, // boots
-  accessory: 50,
-  head: 60,
-  off_hand: 70,
-  tool: 80, // main hand
-  companion: 90
-};
-
-function renderPaperDollAvatar(kid, equipment) {
-  const bodyType = getAvatarBodyType(kid); // Returns "boy" or "girl"
-  const childName = String(kid.name || kid.displayName || "").trim().toLowerCase();
-  
-  // Wesley is explicitly left-handed, default others to right unless otherwise specified
-  const isLeftHanded = kid.handedness === "left" || childName === "wesley";
-
-  // Helper function to generate an image tag for a layer
-  const renderLayer = (src, zIndex, alt) => {
-    return `<img class="paper-doll-layer" src="${src}" alt="${escapeAttribute(alt)}" style="z-index: ${zIndex};">`;
-  };
-
-  let layersHtml = "";
-
-  // 1. Cape
-  if (equipment?.cape) {
-    layersHtml += renderLayer(`assets/equipment/${equipment.cape.grade}/${equipment.cape.itemType}.png`, AVATAR_LAYER_ORDER.cape, equipment.cape.name);
-  }
-
-  // 2. Transparent Base Mannequin
-  layersHtml += renderLayer(`assets/avatar/${bodyType}-base.png`, AVATAR_LAYER_ORDER.base, `${bodyType} base mannequin`);
-
-  // 3. Body Armor
-  if (equipment?.body) {
-    layersHtml += renderLayer(`assets/equipment/${equipment.body.grade}/${equipment.body.itemType}.png`, AVATAR_LAYER_ORDER.body, equipment.body.name);
-  }
-
-  // 4. Boots
-  if (equipment?.feet) {
-    layersHtml += renderLayer(`assets/equipment/${equipment.feet.grade}/${equipment.feet.itemType}.png`, AVATAR_LAYER_ORDER.feet, equipment.feet.name);
-  }
-
-  // 5. Accessory
-  if (equipment?.accessory) {
-    layersHtml += renderLayer(`assets/equipment/${equipment.accessory.grade}/${equipment.accessory.itemType}.png`, AVATAR_LAYER_ORDER.accessory, equipment.accessory.name);
-  }
-
-  // 6. Headwear
-  if (equipment?.head) {
-    layersHtml += renderLayer(`assets/equipment/${equipment.head.grade}/${equipment.head.itemType}.png`, AVATAR_LAYER_ORDER.head, equipment.head.name);
-  }
-
-// 7. Off Hand (Shields, spellbooks)
-  if (equipment?.off_hand) {
-    const handedSuffix = isLeftHanded ? "-left" : "";
-    layersHtml += renderLayer(`assets/equipment/${equipment.off_hand.grade}/${equipment.off_hand.itemType}${handedSuffix}.png`, AVATAR_LAYER_ORDER.off_hand, equipment.off_hand.name);
-  }
-
-  // 8. Main Hand (Swords, wands)
-  if (equipment?.main_hand) {
-    const handedSuffix = isLeftHanded ? "-left" : "";
-    layersHtml += renderLayer(`assets/equipment/${equipment.main_hand.grade}/${equipment.main_hand.itemType}${handedSuffix}.png`, AVATAR_LAYER_ORDER.main_hand, equipment.main_hand.name);
-  }
-    // 9. Companion
-  if (equipment?.companion) {
-    layersHtml += renderLayer(`assets/equipment/${equipment.companion.grade}/${equipment.companion.itemType}.png`, AVATAR_LAYER_ORDER.companion, equipment.companion.name);
-  }
-
-  // Determine external glow effect based on highest tier equipped
-  const hasMythril = Object.values(equipment || {}).some(item => item?.grade === "mythril");
-  const glow = hasMythril
-    ? "drop-shadow(0 0 20px rgba(109,216,232,.52))"
-    : "drop-shadow(0 18px 35px rgba(0,0,0,.45))";
-
-  return `
-    <div aria-label="Illustrated layered character avatar" style="width:min(100%, 440px); margin:8px auto 0; filter:${glow};">
-      <div class="paper-doll-container">
-        ${layersHtml}
-      </div>
-    </div>`;
-}
-
-const ILLUSTRATED_AVATAR_ASSETS = {
-  boy: "assets/avatar/boy-starter-full.png",
-  girl: "assets/avatar/girl-starter-full.png"
-};
 
 const GIRL_AVATAR_NAMES = new Set(["ava", "autumn"]);
 const BOY_AVATAR_NAMES = new Set(["wesley", "cammron", "cameron"]);
@@ -372,40 +286,54 @@ function getAvatarBodyType(kid) {
   return "boy";
 }
 
-function hasIllustratedStarterLoadout(equipment) {
-  const required = {
-    head: "wizard_hat",
-    feet: "swift_boots",
-    accessory: "lucky_amulet",
-    cape: "hero_cape",
-    main_hand: "training_sword"
-  };
-  return Object.entries(required).every(([slot, itemType]) => equipment?.[slot]?.itemType === itemType);
-}
-function renderIllustratedCompositeAvatar(kid) {
-  const bodyType = getAvatarBodyType(kid);
-  const asset = ILLUSTRATED_AVATAR_ASSETS[bodyType] || ILLUSTRATED_AVATAR_ASSETS.boy;
-  const isLeftHanded = String(kid?.name || "").trim().toLowerCase() === "wesley" || String(kid?.handedness || "").toLowerCase() === "left";
-  return `
-    <div aria-label="Illustrated ${bodyType} character avatar" style="width:min(100%,440px);margin:8px auto 0;">
-      <div style="position:relative;border-radius:26px;overflow:hidden;background:linear-gradient(180deg,#202944,#111a33);box-shadow:0 18px 40px rgba(0,0,0,.28), inset 0 0 0 1px rgba(255,255,255,.08);">
-        <img
-          src="${asset}"
-          alt="Illustrated three-quarter ${bodyType} adventurer wearing the equipped starter gear"
-          style="display:block;width:100%;height:auto;transform:${isLeftHanded ? "scaleX(-1)" : "none"};transform-origin:center;"
-        >
-      </div>
-    </div>`;
+const CHARACTER_PORTRAIT_FILES = {
+  ava: "ava-character.webp",
+  autumn: "autumn-character.webp",
+  wesley: "wesley-character.webp"
+};
+
+function getCharacterPortraitSource(kid) {
+  const saved = String(kid?.portraitFile || "").trim();
+  if (saved) {
+    return saved.startsWith("assets/") ? saved : `assets/portraits/${saved}`;
+  }
+
+  const name = String(kid?.name || "").trim().toLowerCase();
+  const filename = CHARACTER_PORTRAIT_FILES[name];
+  return filename ? `assets/portraits/${filename}` : "";
 }
 
-function renderLayeredAvatar(kid, equipment) {
-  // If they have the exact starter layout, we can still use the hardcoded composite if you want
-  if (hasIllustratedStarterLoadout(equipment)) {
-    return renderIllustratedCompositeAvatar(kid);
-  }
-  
-  // Otherwise, use the new PNG layer stacking system
-  return renderPaperDollAvatar(kid, equipment);
+function renderCharacterThumbnail(kid) {
+  const src = getCharacterPortraitSource(kid);
+  const fallback = escapeHtml(kid?.avatar || "🧙");
+  if (!src) return `<span class="character-thumbnail-fallback">${fallback}</span>`;
+
+  return `
+    <img
+      class="character-thumbnail-image"
+      src="${escapeAttribute(src)}"
+      alt=""
+      onerror="this.hidden=true;this.nextElementSibling.hidden=false;"
+    >
+    <span class="character-thumbnail-fallback" hidden>${fallback}</span>`;
+}
+
+function renderCharacterPortrait(kid) {
+  const src = getCharacterPortraitSource(kid);
+  const fallback = escapeHtml(kid?.avatar || "🧙");
+
+  return `
+    <div class="character-portrait-frame">
+      ${src ? `
+        <img
+          class="character-portrait-image"
+          src="${escapeAttribute(src)}"
+          alt="${escapeAttribute(kid.name || "Adventurer")} character portrait"
+          onerror="this.hidden=true;this.nextElementSibling.hidden=false;"
+        >
+        <div class="character-portrait-fallback" hidden>${fallback}</div>`
+        : `<div class="character-portrait-fallback">${fallback}</div>`}
+    </div>`;
 }
 
 function isParentUser(user) {
@@ -524,7 +452,7 @@ async function loadUserDashboard(user = auth.currentUser) {
         <section class="character-select">
           ${kids.map(kid => `
             <button class="character-card-btn kid-select-btn" type="button" data-kid-id="${escapeAttribute(kid.kidId)}">
-              <div class="avatar">${kid.avatar || "🧙"}</div>
+              <div class="avatar">${renderCharacterThumbnail(kid)}</div>
               <strong>${escapeHtml(kid.name || kid.kidId)}</strong>
               <span>${escapeHtml(kid.classTitle || `Level ${kid.level || 1} Adventurer`)}</span>
             </button>`).join("")}
@@ -562,7 +490,7 @@ async function loadChildSelector() {
         <section class="character-select">
           ${activeKids.map(kid => `
             <button class="character-card-btn child-only-select-btn" type="button" data-kid-id="${escapeAttribute(kid.kidId)}">
-              <div class="avatar">${kid.avatar || "🧙"}</div>
+              <div class="avatar">${renderCharacterThumbnail(kid)}</div>
               <strong>${escapeHtml(kid.name || kid.kidId)}</strong>
               <span>${escapeHtml(kid.classTitle || `Level ${kid.level || 1} Adventurer`)}</span>
             </button>`).join("")}
@@ -625,7 +553,7 @@ async function loadKidEntry(kidId) {
 
     document.body.innerHTML = `
       <main class="app">
-        <header class="hero compact"><div class="logo">${kid.avatar || "🧙"}</div><h1>${escapeHtml(kid.name || kidId)}</h1><p>Enter your 4-digit PIN</p></header>
+        <header class="hero compact"><div class="logo character-logo">${renderCharacterThumbnail(kid)}</div><h1>${escapeHtml(kid.name || kidId)}</h1><p>Enter your 4-digit PIN</p></header>
         <section class="card form-card">
           ${kid.pinHash ? `
             <div class="form-field"><label for="kidPin">PIN</label><input id="kidPin" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off"></div>
@@ -1010,7 +938,7 @@ function renderDashboard(kid, mainQuests, sideQuests, allKids) {
   document.body.innerHTML = `
     <main class="app">
       <header class="hero compact">
-        <div class="logo">${kid.avatar || "🧙"}</div>
+        <div class="logo character-logo">${renderCharacterThumbnail(kid)}</div>
         <h1>${escapeHtml(kid.name || kid.kidId)}</h1>
         <p>${escapeHtml(kid.classTitle || "")}</p>
         <small class="class-path">${escapeHtml(kid.classPath || "")}</small>
@@ -1157,6 +1085,52 @@ function radarChartSvg(stats) {
   </svg>`;
 }
 
+const EQUIPMENT_SLOT_ICONS = {
+  head: "🪖",
+  body: "🥋",
+  feet: "👢",
+  accessory: "💍",
+  cape: "🧥",
+  main_hand: "⚔️",
+  off_hand: "🛡️",
+  companion: "🐾"
+};
+
+function displayItemName(item) {
+  if (!item) return "Nothing equipped";
+  const definition = ITEM_TYPES[item.itemType];
+  if (!definition) return item.name || "Unknown Item";
+  if (item.grade === "wood") return definition.name;
+  return item.name || `${ITEM_GRADES[item.grade]?.name || ""} ${definition.name}`.trim();
+}
+
+function statAbbreviation(key) {
+  return {
+    strength: "STR",
+    wisdom: "WIS",
+    agility: "AGI",
+    kindness: "KIND",
+    luck: "LUCK",
+    courage: "COUR"
+  }[key] || key.toUpperCase();
+}
+
+function equipmentComparisonHtml(candidate, current) {
+  const candidateBonuses = candidate?.bonuses || {};
+  const currentBonuses = current?.bonuses || {};
+  const changes = STAT_KEYS.map(key => ({
+    key,
+    change: Number(candidateBonuses[key] || 0) - Number(currentBonuses[key] || 0)
+  })).filter(entry => entry.change !== 0);
+
+  if (!changes.length) return '<span class="equipment-delta neutral">No stat change</span>';
+
+  return changes.map(({ key, change }) => `
+    <span class="equipment-delta ${change > 0 ? "positive" : "negative"}">
+      ${change > 0 ? "+" : ""}${change} ${statAbbreviation(key)}
+    </span>`).join("");
+}
+
 function renderClassScreen(kid) {
   const def = CLASS_DEFINITIONS[kid.classId];
   const level = Math.max(1, Number(kid.level || 1));
@@ -1170,49 +1144,85 @@ function renderClassScreen(kid) {
   const canChooseBranch1 = level >= 5 && !kid.classBranch1;
   const canChooseBranch2 = level >= 10 && kid.classBranch1 && !kid.classBranch2;
 
-  const equippedCards = Object.entries(EQUIPMENT_SLOTS).map(([slot, label]) => {
+  const equipmentRows = Object.entries(EQUIPMENT_SLOTS).map(([slot, label]) => {
     const item = equipped[slot];
-    if (!item) return `<div class="quest"><div class="quest-icon">➕</div><div class="quest-info"><strong>${label}</strong><span>Nothing equipped</span></div></div>`;
-    const grade = ITEM_GRADES[item.grade] || ITEM_GRADES.copper;
-    return `<div class="quest"><div class="quest-icon" style="box-shadow:0 0 18px ${grade.glow};">${itemIcon(item)}</div><div class="quest-info"><strong>${escapeHtml(item.name || "Item")}</strong><span>${label} • ${grade.name}</span><small class="status status-ready">${escapeHtml(formatBonuses(item))}</small></div><button class="unequip-item-btn" data-slot="${slot}" type="button">Unequip</button></div>`;
+    const grade = item ? (ITEM_GRADES[item.grade] || ITEM_GRADES.wood) : null;
+    return `
+      <button class="equipment-slot-row" type="button" data-equipment-slot="${slot}">
+        <span class="equipment-slot-icon" ${grade ? `style="border-color:${grade.color};box-shadow:0 0 14px ${grade.glow};"` : ""}>
+          ${item ? itemIcon(item) : EQUIPMENT_SLOT_ICONS[slot] || "➕"}
+        </span>
+        <span class="equipment-slot-copy">
+          <small>${escapeHtml(label)}</small>
+          <strong>${escapeHtml(displayItemName(item))}</strong>
+          <span>${item ? escapeHtml(formatBonuses(item)) : "Select an item"}</span>
+        </span>
+        <span class="equipment-slot-arrow">›</span>
+      </button>`;
   }).join("");
 
-  const inventoryCards = inventory.length ? inventory.map(item => {
-    const grade = ITEM_GRADES[item.grade] || ITEM_GRADES.copper;
-    return `<div class="quest inventory-item-card" data-slot="${escapeAttribute(item.slot || "other")}" data-grade="${escapeAttribute(item.grade || "copper")}">
-      <div class="quest-icon" style="border-color:${grade.color};box-shadow:0 0 16px ${grade.glow};">${itemIcon(item)}</div>
-      <div class="quest-info"><strong>${escapeHtml(item.name || "Item")}</strong><span>${escapeHtml(EQUIPMENT_SLOTS[item.slot] || item.slot || "Item")} • ${grade.name} • Value ${Number(item.tradeValue || grade.tradeValue)}</span><small class="status status-ready">${escapeHtml(formatBonuses(item))}</small></div>
-      <button class="equip-item-btn" data-item-id="${escapeAttribute(item.instanceId)}" type="button">Equip</button>
-    </div>`;
-  }).join("") : '<p class="inventory-empty-message">Your inventory is empty.</p>';
+  const statRows = STAT_KEYS.map(key => `
+    <div class="jrpg-stat-row">
+      <span>${statAbbreviation(key)}</span>
+      <strong>${Number(stats[key] || 0)}</strong>
+      <small>Gear +${Number(gearBonuses[key] || 0)}</small>
+    </div>`).join("");
 
   document.body.innerHTML = `
     <main class="app">
-      <header class="hero compact"><div class="logo">${def.icon}</div><h1>${escapeHtml(kid.name || kid.kidId)}</h1><p>${escapeHtml(title)} • Level ${level}</p><small class="class-path">${escapeHtml([def.name, kid.classBranch1 && getCurrentClassTitle({...kid,classBranch2:""}), kid.classBranch2 && title].filter(Boolean).join(" → "))}</small></header>
-      <section class="card character-card">
-        <h2>Character</h2>
-        ${renderLayeredAvatar(kid, equipped)}
-        <p class="xp-text">Base Outfit: fitted white tank top and briefs are built into the mannequin.</p>
+      <header class="hero compact">
+        <div class="logo">${def.icon}</div>
+        <h1>${escapeHtml(kid.name || kid.kidId)}</h1>
+        <p>${escapeHtml(title)} • Level ${level}</p>
+        <small class="class-path">${escapeHtml([def.name, kid.classBranch1 && getCurrentClassTitle({...kid,classBranch2:""}), kid.classBranch2 && title].filter(Boolean).join(" → "))}</small>
+      </header>
+
+      <section class="ff9-character-summary">
+        ${renderCharacterPortrait(kid)}
+        <div class="ff9-character-details">
+          <div><span>Class</span><strong>${escapeHtml(title)}</strong></div>
+          <div><span>Level</span><strong>${level}</strong></div>
+          <div><span>HP</span><strong>${stats.hp}</strong></div>
+          <div><span>Gold</span><strong>${Number(kid.gold || 0)}</strong></div>
+          <div><span>Inventory</span><strong>${inventory.length}</strong></div>
+          <div><span>Rebirths</span><strong>${Number(kid.rebirths || 0)}</strong></div>
+        </div>
       </section>
-      <section class="card"><h2>Stats</h2>${radarChartSvg(stats)}
-        <div class="level-row"><div><span class="label">HP</span><strong>${stats.hp}</strong></div><div><span class="label">Class</span><strong style="font-size:1rem;">${escapeHtml(def.name)}</strong></div><div><span class="label">Rebirths</span><strong>${Number(kid.rebirths || 0)}</strong></div></div>
-        <p class="xp-text">Gear bonuses: ${STAT_KEYS.map(key => `${key.slice(0,3).toUpperCase()} +${gearBonuses[key] || 0}`).join(" • ")}</p>
+
+      <section class="card jrpg-menu-card">
+        <div class="jrpg-section-heading">
+          <div>
+            <h2>Equipment</h2>
+            <p>Choose a slot, then select a compatible item.</p>
+          </div>
+          <span>${Object.keys(equipped).length}/${Object.keys(EQUIPMENT_SLOTS).length}</span>
+        </div>
+        <div class="equipment-slot-list">${equipmentRows}</div>
       </section>
+
+      <section id="equipmentChooserHost" class="card equipment-chooser-host">
+        <div class="equipment-chooser-empty">
+          <span>☝️</span>
+          <p>Select an equipment slot above.</p>
+        </div>
+      </section>
+
+      <section class="card jrpg-menu-card">
+        <div class="jrpg-section-heading">
+          <div><h2>Attributes</h2><p>Current totals, including equipment.</p></div>
+          <span>HP ${stats.hp}</span>
+        </div>
+        <div class="jrpg-stat-grid">${statRows}</div>
+      </section>
+
       <section class="card"><h2>Abilities & Spells</h2>
         ${unlocked.map(a => `<div class="quest"><div class="quest-icon">✨</div><div class="quest-info"><strong>${escapeHtml(a.name)}</strong><span>Unlocked at Level ${a.level}</span><small class="status status-approved">${escapeHtml(a.text)}</small></div></div>`).join("")}
         ${locked.map(a => `<div class="quest"><div class="quest-icon">🔒</div><div class="quest-info"><strong>${escapeHtml(a.name)}</strong><span>Unlocks at Level ${a.level}</span></div></div>`).join("")}
       </section>
+
       ${canChooseBranch1 ? `<section class="card"><h2>Choose Your Level 5 Path</h2>${def.branch1.map(b => `<button class="choose-branch1-btn" data-branch-id="${b.id}" type="button" style="width:100%;margin-bottom:10px;">${b.icon} ${escapeHtml(b.name)}</button>`).join("")}</section>` : ""}
       ${canChooseBranch2 ? `<section class="card"><h2>Choose Your Level 10 Path</h2>${(def.branch2[kid.classBranch1] || []).map(b => `<button class="choose-branch2-btn" data-branch-id="${b.id}" type="button" style="width:100%;margin-bottom:10px;">🌟 ${escapeHtml(b.name)}</button>`).join("")}</section>` : ""}
-      <section class="card"><h2>Equipped Gear</h2>${equippedCards}</section>
-      <section class="card"><h2>Inventory</h2>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-          <label class="form-field"><span>Slot</span><select id="inventorySlotFilter"><option value="all">All slots</option>${Object.entries(EQUIPMENT_SLOTS).map(([id,label]) => `<option value="${id}">${label}</option>`).join("")}</select></label>
-          <label class="form-field"><span>Grade</span><select id="inventoryGradeFilter"><option value="all">All grades</option>${Object.entries(ITEM_GRADES).map(([id,g]) => `<option value="${id}">${g.name}</option>`).join("")}</select></label>
-        </div>
-        <div id="inventoryList">${inventoryCards}</div>
-        <p id="noFilteredItems" style="display:none;color:var(--text-soft);">No items match those filters.</p>
-      </section>
+
       <button id="classScreenBackBtn" type="button" style="width:100%;">← Back to Quests</button>
     </main>`;
 
@@ -1222,6 +1232,7 @@ function renderClassScreen(kid) {
     await updateDoc(doc(db, "kids", kid.kidId), { classBranch1: branch.id, classTitle: branch.name, classPath: `${def.name} → ${branch.name}` });
     await loadClassScreen(kid.kidId);
   }));
+
   document.querySelectorAll(".choose-branch2-btn").forEach(button => button.addEventListener("click", async () => {
     const branch = (def.branch2[kid.classBranch1] || []).find(b => b.id === button.dataset.branchId);
     if (!branch || !confirm(`Choose the ${branch.name} path?`)) return;
@@ -1230,40 +1241,79 @@ function renderClassScreen(kid) {
     await loadClassScreen(kid.kidId);
   }));
 
-  document.querySelectorAll(".equip-item-btn").forEach(button => button.addEventListener("click", async () => {
-    const item = inventory.find(entry => entry.instanceId === button.dataset.itemId);
-    if (!item) return;
-    const nextInventory = inventory.filter(entry => entry.instanceId !== item.instanceId);
-    const nextEquipment = { ...equipped };
-    if (nextEquipment[item.slot]) nextInventory.push({ ...nextEquipment[item.slot], equipped: false });
-    nextEquipment[item.slot] = { ...item, equipped: true };
-    await updateDoc(doc(db, "kids", kid.kidId), { inventory: nextInventory, equipment: nextEquipment });
-    await loadClassScreen(kid.kidId);
-  }));
+  const chooserHost = document.getElementById("equipmentChooserHost");
 
-  document.querySelectorAll(".unequip-item-btn").forEach(button => button.addEventListener("click", async () => {
-    const slot = button.dataset.slot;
-    const item = equipped[slot];
-    if (!item) return;
-    const nextEquipment = { ...equipped };
-    delete nextEquipment[slot];
-    await updateDoc(doc(db, "kids", kid.kidId), { inventory: [...inventory, { ...item, equipped: false }], equipment: nextEquipment });
-    await loadClassScreen(kid.kidId);
-  }));
+  const openEquipmentChooser = slot => {
+    const currentItem = equipped[slot] || null;
+    const matchingItems = inventory.filter(item => item.slot === slot);
+    const slotLabel = EQUIPMENT_SLOTS[slot] || slot;
 
-  const applyInventoryFilters = () => {
-    const slot = document.getElementById("inventorySlotFilter").value;
-    const grade = document.getElementById("inventoryGradeFilter").value;
-    let shown = 0;
-    document.querySelectorAll(".inventory-item-card").forEach(card => {
-      const visible = (slot === "all" || card.dataset.slot === slot) && (grade === "all" || card.dataset.grade === grade);
-      card.style.display = visible ? "grid" : "none";
-      if (visible) shown++;
+    chooserHost.innerHTML = `
+      <div class="jrpg-section-heading">
+        <div><h2>${escapeHtml(slotLabel)}</h2><p>${matchingItems.length} compatible item${matchingItems.length === 1 ? "" : "s"} available.</p></div>
+        <button id="closeEquipmentChooserBtn" class="equipment-close-btn" type="button">✕</button>
+      </div>
+
+      ${currentItem ? `
+        <div class="equipment-current-item">
+          <span class="equipment-slot-icon">${itemIcon(currentItem)}</span>
+          <div><small>Currently equipped</small><strong>${escapeHtml(displayItemName(currentItem))}</strong><span>${escapeHtml(formatBonuses(currentItem))}</span></div>
+          <button id="removeEquipmentBtn" type="button">Remove</button>
+        </div>` : '<p class="equipment-none-equipped">Nothing is currently equipped in this slot.</p>'}
+
+      <div class="equipment-choice-list">
+        ${matchingItems.length ? matchingItems.map(item => {
+          const grade = ITEM_GRADES[item.grade] || ITEM_GRADES.wood;
+          return `
+            <button class="equipment-choice-row" type="button" data-item-id="${escapeAttribute(item.instanceId)}">
+              <span class="equipment-slot-icon" style="border-color:${grade.color};box-shadow:0 0 14px ${grade.glow};">${itemIcon(item)}</span>
+              <span class="equipment-choice-copy">
+                <strong>${escapeHtml(displayItemName(item))}</strong>
+                <small>${grade.name} • ${escapeHtml(formatBonuses(item))}</small>
+                <span class="equipment-delta-list">${equipmentComparisonHtml(item, currentItem)}</span>
+              </span>
+              <span class="equipment-choice-action">Equip</span>
+            </button>`;
+        }).join("") : '<div class="equipment-chooser-empty"><span>🎒</span><p>No compatible items are in the inventory yet.</p></div>'}
+      </div>`;
+
+    document.querySelectorAll(".equipment-slot-row").forEach(row => {
+      row.classList.toggle("selected", row.dataset.equipmentSlot === slot);
     });
-    document.getElementById("noFilteredItems").style.display = inventory.length && shown === 0 ? "block" : "none";
+
+    document.getElementById("closeEquipmentChooserBtn")?.addEventListener("click", () => {
+      chooserHost.innerHTML = '<div class="equipment-chooser-empty"><span>☝️</span><p>Select an equipment slot above.</p></div>';
+      document.querySelectorAll(".equipment-slot-row").forEach(row => row.classList.remove("selected"));
+    });
+
+    document.getElementById("removeEquipmentBtn")?.addEventListener("click", async () => {
+      const nextEquipment = { ...equipped };
+      delete nextEquipment[slot];
+      await updateDoc(doc(db, "kids", kid.kidId), {
+        inventory: [...inventory, { ...currentItem, equipped: false }],
+        equipment: nextEquipment
+      });
+      await loadClassScreen(kid.kidId);
+    });
+
+    document.querySelectorAll(".equipment-choice-row").forEach(button => button.addEventListener("click", async () => {
+      const item = inventory.find(entry => entry.instanceId === button.dataset.itemId);
+      if (!item) return;
+      const nextInventory = inventory.filter(entry => entry.instanceId !== item.instanceId);
+      const nextEquipment = { ...equipped };
+      if (nextEquipment[slot]) nextInventory.push({ ...nextEquipment[slot], equipped: false });
+      nextEquipment[slot] = { ...item, equipped: true };
+      await updateDoc(doc(db, "kids", kid.kidId), { inventory: nextInventory, equipment: nextEquipment });
+      await loadClassScreen(kid.kidId);
+    }));
+
+    chooserHost.scrollIntoView({ behavior: "smooth", block: "start" });
   };
-  document.getElementById("inventorySlotFilter").addEventListener("change", applyInventoryFilters);
-  document.getElementById("inventoryGradeFilter").addEventListener("change", applyInventoryFilters);
+
+  document.querySelectorAll(".equipment-slot-row").forEach(button => {
+    button.addEventListener("click", () => openEquipmentChooser(button.dataset.equipmentSlot));
+  });
+
   document.getElementById("classScreenBackBtn").addEventListener("click", () => loadKidDashboard(kid.kidId));
 }
 
@@ -1448,7 +1498,7 @@ function renderParentDashboard(data, user) {
           const doneMain = main.filter(q => doneIds.has(q.choreId)).length;
           const pct = main.length ? Math.round(doneMain / main.length * 100) : 0;
           return `<button class="character-card-btn child-detail-btn" type="button" data-kid-id="${escapeAttribute(kid.kidId)}" style="margin-bottom:12px;">
-            <div class="avatar">${kid.avatar || "🧙"}</div><strong>${escapeHtml(kid.name || kid.kidId)}</strong>
+            <div class="avatar">${renderCharacterThumbnail(kid)}</div><strong>${escapeHtml(kid.name || kid.kidId)}</strong>
             <span>Level ${Number(kid.level || 1)} • ${Number(kid.gold || 0)} Gold • ${Number(kid.currentStreak || 0)}🔥 streak • Best ${Number(kid.bestStreak || 0)} • ${doneMain}/${main.length} Main Quests (${pct}%)</span>
           </button>`;
         }).join("")}
@@ -1560,7 +1610,7 @@ async function loadChildDetail(kidId, user) {
     const pendingForKid = submissions.filter(s => s.status === "Pending" && Array.isArray(s.participantIds) && s.participantIds.includes(kidId));
     const recent = history.filter(h => Array.isArray(h.participantIds) && h.participantIds.includes(kidId));
     document.body.innerHTML = `<main class="app">${renderSignOutHeader(user)}
-      <header class="hero compact"><div class="logo">${kid.avatar || "🧙"}</div><h1>${escapeHtml(kid.name || kidId)}</h1><p>Today's progress</p></header>
+      <header class="hero compact"><div class="logo character-logo">${renderCharacterThumbnail(kid)}</div><h1>${escapeHtml(kid.name || kidId)}</h1><p>Today's progress</p></header>
       <section class="card character-card"><div class="level-row">
         <div><span class="label">Current Streak</span><strong>${Number(kid.currentStreak || 0)}🔥</strong></div>
         <div><span class="label">Best Streak</span><strong>${Number(kid.bestStreak || 0)}</strong></div>
@@ -1602,7 +1652,7 @@ async function loadFamilyAccounts(user) {
         <section class="card">
           ${kids.map(kid => `
             <div class="quest">
-              <div class="quest-icon">${kid.avatar || "🧙"}</div>
+              <div class="quest-icon character-quest-icon">${renderCharacterThumbnail(kid)}</div>
               <div class="quest-info"><strong>${escapeHtml(kid.name || kid.kidId)}</strong><span>${escapeHtml(kid.kidId)} • ${kid.pinHash ? 'PIN set' : 'PIN not set'}</span><small class="status ${kid.active === false ? 'status-pending' : 'status-ready'}">${kid.active === false ? 'Disabled' : 'Active'}</small></div>
               <div class="parent-buttons family-account-actions" style="grid-column:1 / -1; display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; width:100%; margin-top:8px;">
                 <button class="edit-kid-btn" type="button" data-kid-id="${escapeAttribute(kid.kidId)}">✏️ Edit Profile</button>
