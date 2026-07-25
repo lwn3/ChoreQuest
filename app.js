@@ -152,41 +152,83 @@ const ITEM_GRADES = {
 
 const ITEM_TYPES = {
   // --- WOOD TIER: MAIN HAND ---
-  wooden_sword: { name: "Wooden Sword", slot: "main_hand", icon: "🗡️", bonuses: { strength: 2 } },
-  stick: { name: "Stick", slot: "main_hand", icon: "🪵", bonuses: { wisdom: 1, luck: 1 } },
-  branch: { name: "Branch", slot: "main_hand", icon: "🌿", bonuses: { wisdom: 2 } },
-  wooden_bow: { name: "Wooden Bow", slot: "main_hand", icon: "🏹", bonuses: { agility: 2 } },
-  wooden_axe: { name: "Wooden Axe", slot: "main_hand", icon: "🪓", bonuses: { strength: 2, courage: 1 } },
+  wooden_sword: { name: "Wooden Sword", slot: "main_hand", icon: "\ud83d\udde1\ufe0f", iconFile: "wooden_sword.webp", bonuses: { strength: 2 } },
+  stick: { name: "Stick", slot: "main_hand", icon: "\ud83e\udeb5", iconFile: "stick.webp", bonuses: { wisdom: 1, luck: 1 } },
+  branch: { name: "Branch", slot: "main_hand", icon: "\ud83c\udf3f", iconFile: "branch.webp", bonuses: { wisdom: 2 } },
+  wooden_bow: { name: "Wooden Bow", slot: "main_hand", icon: "\ud83c\udff9", iconFile: "wooden_bow.webp", bonuses: { agility: 2 } },
+  wooden_axe: { name: "Wooden Axe", slot: "main_hand", icon: "\ud83e\ude93", iconFile: "wooden_axe.webp", bonuses: { strength: 2, courage: 1 } },
 
   // --- WOOD TIER: OFF HAND ---
-  wooden_shield: { name: "Wooden Shield", slot: "off_hand", icon: "🛡️", bonuses: { strength: 1, courage: 1 } },
-  wooden_tome: { name: "Wooden Tome", slot: "off_hand", icon: "📖", bonuses: { wisdom: 2 } },
-  carved_rune_slate: { name: "Carved Rune Slate", slot: "off_hand", icon: "🪨", bonuses: { wisdom: 1, kindness: 1 } },
+  wooden_shield: { name: "Wooden Shield", slot: "off_hand", icon: "\ud83d\udee1\ufe0f", iconFile: "wooden_shield.webp", bonuses: { strength: 1, courage: 1 } },
+  wooden_tome: { name: "Wooden Tome", slot: "off_hand", icon: "\ud83d\udcd6", iconFile: "wooden_tome.webp", bonuses: { wisdom: 2 } },
+  carved_rune_slate: { name: "Carved Rune Slate", slot: "off_hand", icon: "\ud83e\udea8", iconFile: "carved_rune_slate.webp", bonuses: { wisdom: 1, kindness: 1 } },
 
   // --- WOOD TIER: HEAD ---
-  bark_cap: { name: "Bark Cap", slot: "head", icon: "🍄", bonuses: { courage: 1 } },
-  wooden_helmet: { name: "Wooden Helmet", slot: "head", icon: "🪖", bonuses: { strength: 1, courage: 1 } },
-  wooden_circlet: { name: "Wooden Circlet", slot: "head", icon: "⭕", bonuses: { wisdom: 1 } },
-  wooden_hat: { name: "Wooden Hat", slot: "head", icon: "🎩", bonuses: { luck: 1 } },
-  wood_crown: { name: "Wood Crown", slot: "head", icon: "👑", bonuses: { courage: 1, luck: 1 } },
+  bark_cap: { name: "Bark Cap", slot: "head", icon: "\ud83c\udf44", iconFile: "bark_cap.webp", bonuses: { courage: 1 } },
+  wooden_helmet: { name: "Wooden Helmet", slot: "head", icon: "\ud83e\ude96", iconFile: "wooden_helmet.webp", bonuses: { strength: 1, courage: 1 } },
+  wooden_circlet: { name: "Wooden Circlet", slot: "head", icon: "\u2b55", iconFile: "wooden_circlet.webp", bonuses: { wisdom: 1 } },
+  wooden_hat: { name: "Wooden Hat", slot: "head", icon: "\ud83c\udfa9", iconFile: "wooden_hat.webp", bonuses: { luck: 1 } },
+  wood_crown: { name: "Wood Crown", slot: "head", icon: "\ud83d\udc51", iconFile: "wood_crown.webp", bonuses: { courage: 1, luck: 1 } },
 
   // --- WOOD TIER: BODY ---
-  wooden_tunic: { name: "Wooden Tunic", slot: "body", icon: "🥋", bonuses: { courage: 1, kindness: 1 } },
-  wooden_robes: { name: "Wooden Robes", slot: "body", icon: "👘", bonuses: { wisdom: 2 } },
+  wooden_tunic: { name: "Wooden Tunic", slot: "body", icon: "\ud83e\udd4b", iconFile: "wooden_tunic.webp", bonuses: { courage: 1, kindness: 1 } },
+  wooden_robes: { name: "Wooden Robes", slot: "body", icon: "\ud83d\udc58", iconFile: "wooden_robes.webp", bonuses: { wisdom: 2 } },
 
   // --- WOOD TIER: FEET ---
-  wooden_boots: { name: "Wooden Boots", slot: "feet", icon: "👢", bonuses: { strength: 1 } },
-  wooden_shoes: { name: "Wooden Shoes", slot: "feet", icon: "👞", bonuses: { agility: 1 } },
-  wooden_slippers: { name: "Wooden Slippers", slot: "feet", icon: "🥿", bonuses: { luck: 1, agility: 1 } },
+  wooden_boots: { name: "Wooden Boots", slot: "feet", icon: "\ud83d\udc62", iconFile: "wooden_boots.webp", bonuses: { strength: 1 } },
+  wooden_shoes: { name: "Wooden Shoes", slot: "feet", icon: "\ud83d\udc5e", iconFile: "wooden_shoes.webp", bonuses: { agility: 1 } },
+  wooden_slippers: { name: "Wooden Slippers", slot: "feet", icon: "\ud83e\udd7f", iconFile: "wooden_slippers.webp", bonuses: { luck: 1, agility: 1 } },
 
   // --- WOOD TIER: CAPE ---
-  leaf_cape: { name: "Leaf Cape", slot: "cape", icon: "🍂", bonuses: { agility: 1, courage: 1 } },
+  leaf_cape: { name: "Leaf Cape", slot: "cape", icon: "\ud83c\udf42", iconFile: "leaf_cape.webp", bonuses: { agility: 1, courage: 1 } },
+  moss_cloak: { name: "Moss Cloak", slot: "cape", icon: "\ud83c\udf3f", iconFile: "moss_cloak.webp", bonuses: { kindness: 1, wisdom: 1 } },
 
   // --- WOOD TIER: ACCESSORY ---
-  wooden_medallion: { name: "Wooden Medallion", slot: "accessory", icon: "🪙", bonuses: { luck: 1 } },
-  acorn_pendant: { name: "Acorn Pendant", slot: "accessory", icon: "🌰", bonuses: { luck: 2 } },
-  twine_quiver: { name: "Twine Quiver", slot: "accessory", icon: "🧵", bonuses: { agility: 1 } },
-  willow_ring: { name: "Willow Ring", slot: "accessory", icon: "💍", bonuses: { kindness: 2 } }
+  wooden_pendant: { name: "Wooden Pendant", slot: "accessory", icon: "\ud83e\ude99", iconFile: "wooden_pendant.webp", bonuses: { luck: 1 } },
+  acorn_charm: { name: "Acorn Charm", slot: "accessory", icon: "\ud83c\udf30", iconFile: "acorn_charm.webp", bonuses: { luck: 2 } },
+  pinecone_amulet: { name: "Pinecone Amulet", slot: "accessory", icon: "\ud83c\udf32", iconFile: "pinecone_amulet.webp", bonuses: { kindness: 1, courage: 1 } },
+
+  // --- LEGACY TEST ITEMS ---
+  wooden_medallion: { name: "Wooden Medallion", slot: "accessory", icon: "🪙", iconFile: "wooden_pendant.webp", bonuses: { luck: 1 } },
+  acorn_pendant: { name: "Acorn Pendant", slot: "accessory", icon: "🌰", iconFile: "acorn_charm.webp", bonuses: { luck: 2 } },
+  twine_quiver: { name: "Twine Quiver", slot: "accessory", icon: "🧵", iconFile: "pinecone_amulet.webp", bonuses: { agility: 1 } },
+  willow_ring: { name: "Willow Ring", slot: "accessory", icon: "💍", iconFile: "wooden_pendant.webp", bonuses: { kindness: 2 } }
+};
+
+const INVENTORY_VERSION = 2;
+const STARTER_WOOD_ITEM_TYPES = [
+  "wooden_sword",
+  "stick",
+  "branch",
+  "wooden_bow",
+  "wooden_axe",
+  "wooden_shield",
+  "wooden_tome",
+  "carved_rune_slate",
+  "bark_cap",
+  "wooden_helmet",
+  "wooden_circlet",
+  "wooden_hat",
+  "wood_crown",
+  "wooden_tunic",
+  "wooden_robes",
+  "wooden_boots",
+  "wooden_shoes",
+  "wooden_slippers",
+  "leaf_cape",
+  "moss_cloak",
+  "wooden_pendant",
+  "acorn_charm",
+  "pinecone_amulet",
+];
+
+const STARTER_EQUIPMENT_TYPES = {
+  head: "bark_cap",
+  body: "wooden_tunic",
+  feet: "wooden_boots",
+  cape: "leaf_cape",
+  main_hand: "wooden_sword",
+  off_hand: "wooden_shield"
 };
 
 const EQUIPMENT_SLOTS = {
@@ -202,7 +244,8 @@ const EQUIPMENT_SLOTS = {
 
 function createItem(itemType, grade = "wood") {
   const def = ITEM_TYPES[itemType];
-  const gradeDef = ITEM_GRADES[grade] || ITEM_GRADES.copper;
+  if (!def) throw new Error(`Unknown item type: ${itemType}`);
+  const gradeDef = ITEM_GRADES[grade] || ITEM_GRADES.wood;
   return {
     instanceId: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     itemType,
@@ -217,26 +260,73 @@ function createItem(itemType, grade = "wood") {
 }
 
 function starterInventory() {
-  return [
-    createItem("wooden_sword", "wood"),
-    createItem("wooden_shield", "wood"),
-    createItem("bark_cap", "wood"),
-    createItem("wooden_tunic", "wood"),
-    createItem("wooden_boots", "wood"),
-    createItem("leaf_cape", "wood")
-  ];
+  return STARTER_WOOD_ITEM_TYPES.map(itemType => createItem(itemType, "wood"));
+}
+
+function normalizeStoredItem(item) {
+  if (!item || typeof item !== "object") return item;
+  const def = ITEM_TYPES[item.itemType];
+  if (!def) return item;
+  const grade = item.grade || "wood";
+  const gradeDef = ITEM_GRADES[grade] || ITEM_GRADES.wood;
+  return {
+    ...item,
+    name: grade === "wood" ? def.name : `${gradeDef.name} ${def.name}`,
+    slot: def.slot,
+    grade,
+    tradeValue: Number(item.tradeValue || gradeDef.tradeValue),
+    bonuses: item.bonuses && typeof item.bonuses === "object"
+      ? item.bonuses
+      : Object.fromEntries(Object.entries(def.bonuses).map(([key, value]) => [key, value * gradeDef.multiplier]))
+  };
 }
 
 async function ensureInventoryInitialized(kid) {
-  if (kid.inventoryVersion >= 1 && Array.isArray(kid.inventory) && kid.equipment && typeof kid.equipment === "object") return kid;
-  const inventory = Array.isArray(kid.inventory) ? kid.inventory : starterInventory();
-  const equipment = kid.equipment && typeof kid.equipment === "object" ? kid.equipment : {};
-  await updateDoc(doc(db, "kids", kid.kidId), {
-    inventory,
-    equipment,
-    inventoryVersion: 1
+  const hasCurrentVersion = Number(kid.inventoryVersion || 0) >= INVENTORY_VERSION;
+  if (hasCurrentVersion && Array.isArray(kid.inventory) && kid.equipment && typeof kid.equipment === "object") return kid;
+
+  const inventory = (Array.isArray(kid.inventory) ? kid.inventory : []).map(normalizeStoredItem).filter(Boolean);
+  const equipment = Object.fromEntries(
+    Object.entries(kid.equipment && typeof kid.equipment === "object" ? kid.equipment : {})
+      .map(([slot, item]) => [slot, normalizeStoredItem(item)])
+      .filter(([, item]) => Boolean(item))
+  );
+
+  const ownedWoodTypes = new Set([
+    ...inventory.filter(item => (item.grade || "wood") === "wood").map(item => item.itemType),
+    ...Object.values(equipment).filter(item => (item?.grade || "wood") === "wood").map(item => item.itemType)
+  ]);
+
+  STARTER_WOOD_ITEM_TYPES.forEach(itemType => {
+    if (!ownedWoodTypes.has(itemType)) inventory.push(createItem(itemType, "wood"));
   });
-  return { ...kid, inventory, equipment, inventoryVersion: 1 };
+
+  Object.entries(STARTER_EQUIPMENT_TYPES).forEach(([slot, itemType]) => {
+    if (equipment[slot]) return;
+    const inventoryIndex = inventory.findIndex(item => item.itemType === itemType && (item.grade || "wood") === "wood");
+    if (inventoryIndex < 0) return;
+    const [item] = inventory.splice(inventoryIndex, 1);
+    equipment[slot] = { ...item, equipped: true };
+  });
+
+  const normalizedInventory = inventory.map(item => ({ ...item, equipped: false }));
+  await updateDoc(doc(db, "kids", kid.kidId), {
+    inventory: normalizedInventory,
+    equipment,
+    inventoryVersion: INVENTORY_VERSION
+  });
+  return { ...kid, inventory: normalizedInventory, equipment, inventoryVersion: INVENTORY_VERSION };
+}
+
+function itemIcon(item) {
+  const def = ITEM_TYPES[item?.itemType];
+  const fallback = escapeHtml(def?.icon || "🎁");
+  if (!def?.iconFile) return `<span class="equipment-item-icon-fallback">${fallback}</span>`;
+  const grade = String(item?.grade || "wood");
+  const src = `assets/equipment-icons/${grade}/${def.iconFile}?v=3`;
+  return `
+    <img class="equipment-item-icon-image" src="${escapeAttribute(src)}" alt="" onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+    <span class="equipment-item-icon-fallback" hidden>${fallback}</span>`;
 }
 
 function equipmentBonuses(equipment) {
@@ -254,37 +344,10 @@ function formatBonuses(item) {
   return entries.length ? entries.map(([key, value]) => `+${value} ${key[0].toUpperCase()}${key.slice(1)}`).join(" • ") : "Cosmetic item";
 }
 
-function itemIcon(item) {
-  return ITEM_TYPES[item?.itemType]?.icon || "🎁";
-}
-
-function gradePalette(grade) {
-  const palettes = {
-    wood: { main: "#a8753f", light: "#d5aa72", dark: "#62401f", glow: "rgba(168,117,63,.35)" },
-    copper: { main: "#b87333", light: "#e3a56a", dark: "#74421f", glow: "rgba(184,115,51,.35)" },
-    iron: { main: "#727b86", light: "#b9c0c8", dark: "#3e4650", glow: "rgba(185,192,200,.3)" },
-    silver: { main: "#c9d5e3", light: "#f3f7ff", dark: "#74859a", glow: "rgba(201,213,227,.4)" },
-    gold: { main: "#e5b93f", light: "#ffe98a", dark: "#8d6514", glow: "rgba(255,214,79,.45)" },
-    mythril: { main: "#6dd8e8", light: "#d7fbff", dark: "#267f97", glow: "rgba(109,216,232,.55)" }
-  };
-  return palettes[grade] || palettes.copper;
-}
 
 /* -------------------------------------------------
    STATIC CHARACTER PORTRAIT
 ------------------------------------------------- */
-
-const GIRL_AVATAR_NAMES = new Set(["ava", "autumn"]);
-const BOY_AVATAR_NAMES = new Set(["wesley", "cammron", "cameron"]);
-
-function getAvatarBodyType(kid) {
-  const saved = String(kid?.avatarBodyType || "").toLowerCase();
-  if (saved === "girl" || saved === "boy") return saved;
-  const name = String(kid?.name || "").trim().toLowerCase();
-  if (GIRL_AVATAR_NAMES.has(name)) return "girl";
-  if (BOY_AVATAR_NAMES.has(name)) return "boy";
-  return "boy";
-}
 
 const CHARACTER_PORTRAIT_FILES = {
   ava: "ava-character.webp",
@@ -1698,11 +1761,7 @@ async function loadEditKidForm(kidId, user) {
         <section class="card form-card">
           <div class="form-field"><label for="editKidName">Name</label><input id="editKidName" value="${escapeAttribute(kid.name || '')}"></div>
           <div class="form-field"><label for="editKidAvatar">Avatar Emoji</label><input id="editKidAvatar" value="${escapeAttribute(kid.avatar || '🧙')}"></div>
-          <div class="form-field"><label for="editKidBodyType">Illustrated Character</label><select id="editKidBodyType">
-            <option value="auto" ${!['boy','girl'].includes(String(kid.avatarBodyType || '').toLowerCase()) ? 'selected' : ''}>Automatic by name</option>
-            <option value="boy" ${String(kid.avatarBodyType || '').toLowerCase() === 'boy' ? 'selected' : ''}>Boy adventurer</option>
-            <option value="girl" ${String(kid.avatarBodyType || '').toLowerCase() === 'girl' ? 'selected' : ''}>Girl adventurer</option>
-          </select></div>
+          <div class="form-field"><label for="editKidPortrait">Portrait Filename</label><input id="editKidPortrait" value="${escapeAttribute(kid.portraitFile || '')}" placeholder="cammron-character.webp"></div>
           <div class="form-field"><label for="editKidClass">Class Title</label><input id="editKidClass" value="${escapeAttribute(kid.classTitle || 'Adventurer')}"></div>
           <div class="form-field"><label for="editKidPath">Class Path</label><input id="editKidPath" value="${escapeAttribute(kid.classPath || '')}"></div>
           <div class="form-field"><label for="editKidStreakMode">Streak Rule</label><select id="editKidStreakMode">
@@ -1721,7 +1780,7 @@ async function loadEditKidForm(kidId, user) {
       await updateDoc(doc(db, 'kids', kidId), {
         name,
         avatar: document.getElementById('editKidAvatar').value.trim() || '🧙',
-        avatarBodyType: document.getElementById('editKidBodyType').value === 'auto' ? '' : document.getElementById('editKidBodyType').value,
+        portraitFile: document.getElementById('editKidPortrait').value.trim(),
         classTitle: document.getElementById('editKidClass').value.trim() || 'Adventurer',
         classPath: document.getElementById('editKidPath').value.trim(),
         streakMode: document.getElementById('editKidStreakMode').value,
@@ -1775,11 +1834,7 @@ function loadNewKidForm(user, kids) {
         <div class="form-field"><label>Profile Code</label><input id="newKidId" value="${suggestedId}" maxlength="10"></div>
         <div class="form-field"><label>Name</label><input id="newKidName"></div>
         <div class="form-field"><label>Avatar Emoji</label><input id="newKidAvatar" value="🧙"></div>
-        <div class="form-field"><label>Illustrated Character</label><select id="newKidBodyType">
-          <option value="auto">Automatic by name</option>
-          <option value="boy">Boy adventurer</option>
-          <option value="girl">Girl adventurer</option>
-        </select></div>
+        <div class="form-field"><label>Portrait Filename (optional)</label><input id="newKidPortrait" placeholder="new-character.webp"></div>
         <div class="form-field"><label>Class Title</label><input id="newKidClass" value="Adventurer" placeholder="Unicorn Princess, Dragon Prince..."></div>
         <div class="form-field"><label>Class Path</label><input id="newKidPath" placeholder="Sparkle Keeper → Rainbow Guardian"></div>
         <div class="form-field"><label>Streak Rule</label><select id="newKidStreakMode">
@@ -1803,7 +1858,7 @@ function loadNewKidForm(user, kids) {
     if (existing.exists()) { alert('That profile code already exists.'); return; }
     await setDoc(doc(db, 'kids', kidId), {
       name, avatar: document.getElementById('newKidAvatar').value.trim() || '🧙',
-      avatarBodyType: document.getElementById('newKidBodyType').value === 'auto' ? '' : document.getElementById('newKidBodyType').value,
+      portraitFile: document.getElementById('newKidPortrait').value.trim(),
       classTitle: document.getElementById('newKidClass').value.trim() || 'Adventurer',
       classPath: document.getElementById('newKidPath').value.trim(),
       streakMode: document.getElementById('newKidStreakMode').value,

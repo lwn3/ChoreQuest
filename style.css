@@ -895,30 +895,6 @@ button:disabled {
   }
 }
 /* =========================================================
-   PAPER-DOLL AVATAR
-========================================================= */
-
-.paper-doll-container {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 700 / 900;
-  overflow: hidden;
-  border-radius: 26px; /* Matches your illustrated composite background */
-  background: linear-gradient(180deg, #202944, #111a33);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-}
-
-.paper-doll-layer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  pointer-events: none;
-}
-
-/* =========================================================
    JRPG EQUIPMENT MENU
    Inspired by classic menu-driven RPG equipment screens.
 ========================================================= */
@@ -1082,12 +1058,15 @@ button:disabled {
 .equipment-slot-icon {
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 46px;
+  width: 58px;
+  height: 58px;
+  padding: 0;
+  overflow: visible;
   font-size: 1.55rem;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(205, 226, 255, 0.18);
-  border-radius: 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .equipment-slot-copy,
@@ -1349,4 +1328,35 @@ button:disabled {
 .character-card-btn .avatar .character-thumbnail-image,
 .character-quest-icon .character-thumbnail-image {
   border-radius: inherit;
+}
+
+.equipment-slot-icon {
+  overflow: visible;
+  width: 58px;
+  height: 58px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.equipment-item-icon-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 0;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.32));
+}
+
+.equipment-item-icon-fallback {
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  font-size: 1.55rem;
+}
+
+.equipment-item-icon-fallback:not([hidden]) {
+  display: grid;
 }
