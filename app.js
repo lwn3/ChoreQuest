@@ -1,4 +1,4 @@
-import "./firebase.js";
+import "./firebase.js?v=20260802-2105";
 
 const {
   db,
@@ -12,10 +12,14 @@ const {
   deleteDoc,
   auth,
   googleProvider,
+  signInWithPopup,
   signInWithRedirect,
+  signInWithCustomToken,
   getRedirectResult,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  functions,
+  httpsCallable
 } = window.ChoreQuestFirebase;
 
 // Parent accounts
@@ -33,6 +37,33 @@ const KID_SESSION_MINUTES = 30;
 const PIN_MAX_ATTEMPTS = 5;
 const PIN_LOCK_MINUTES = 15;
 const ANYONE_ID = "ANYONE";
+
+const listChildProfilesCall = httpsCallable(functions, "listChildProfiles");
+const loginChildCall = httpsCallable(functions, "loginChild");
+const setChildPinCall = httpsCallable(functions, "setChildPin");
+
+async function getChildIdentity(user = auth.currentUser) {
+  if (!user) return null;
+  try {
+    const token = await user.getIdTokenResult();
+    if (token.claims.role !== "child" || !token.claims.kidId) return null;
+    return { kidId: String(token.claims.kidId) };
+  } catch {
+    return null;
+  }
+}
+
+async function getPublicKids() {
+  const result = await listChildProfilesCall();
+  const profiles = result?.data?.profiles;
+  return Array.isArray(profiles) ? profiles : [];
+}
+
+async function userCanAccessKid(kidId) {
+  if (isParentUser(auth.currentUser)) return true;
+  const identity = await getChildIdentity(auth.currentUser);
+  return identity?.kidId === kidId;
+}
 
 
 /* -------------------------------------------------
@@ -441,10 +472,31 @@ function initializeAuthRouter() {
     }
 
     if (!isParentUser(user)) {
+  const signedInEmail = String(user.email || "(no email)").toLowerCase();
+
+  document.body.innerHTML = `
+    <main class="app">
+      <section class="card">
+        <h2>Parent account not authorized</h2>
+        <p>Firebase signed in as:</p>
+        <p><strong>${escapeHtml(signedInEmail)}</strong></p>
+        <p>This email is not currently listed as a parent account.</p>
+        <button id="unauthorizedSignOutBtn" type="button">
+          Sign Out
+        </button>
+      </section>
+    </main>
+  `;
+
+  document
+    .getElementById("unauthorizedSignOutBtn")
+    .addEventListener("click", async () => {
       await signOut(auth);
       await loadUserDashboard(null);
-      return;
-    }
+    });
+
+  return;
+}
 
     if (isManager) {
       await loadQuestManager(user);
@@ -456,11 +508,58 @@ function initializeAuthRouter() {
   });
 }
 
+let parentSignInInProgress = false;
+
 async function startParentSignIn() {
+  if (parentSignInInProgress) return;
+  parentSignInInProgress = true;
+
   try {
-    await signInWithRedirect(auth, googleProvider);
+    sessionStorage.removeItem(KID_UNLOCK_KEY);
+    sessionStorage.removeItem(KID_UNLOCK_TIME_KEY);
+
+    if (auth.currentUser) {
+      await signOut(auth);
+    }
+
+    googleProvider.setCustomParameters({
+      prompt: "select_account",
+    });
+
+    const isMobile =
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      await signInWithRedirect(auth, googleProvider);
+      return;
+    }
+
+    const result = await signInWithPopup(auth, googleProvider);
+
+    if (!isParentUser(result.user)) {
+      await signOut(auth);
+      showError("That Google account is not authorized as a parent.");
+      return;
+    }
+
+    window.history.replaceState(
+      {},
+      document.title,
+      window.location.pathname
+    );
+
+    await loadParentDashboard(result.user);
   } catch (err) {
+    if (
+      err?.code === "auth/popup-closed-by-user" ||
+      err?.code === "auth/cancelled-popup-request"
+    ) {
+      return;
+    }
+
     showError("Parent sign in failed: " + err.message);
+  } finally {
+    parentSignInInProgress = false;
   }
 }
 
@@ -500,13 +599,20 @@ function attachSignOutEvent() {
 async function loadUserDashboard(user = auth.currentUser) {
   document.body.innerHTML = `<main class="app"><section class="card"><p>Loading profiles...</p></section></main>`;
   try {
-    const kidsSnap = await getDocs(collection(db, "kids"));
-    const kids = [];
-    kidsSnap.forEach(docSnap => {
-      const kid = { kidId: docSnap.id, ...docSnap.data() };
-      if (kid.active !== false) kids.push(kid);
-    });
-    kids.sort((a,b) => String(a.name || a.kidId).localeCompare(String(b.name || b.kidId)));
+    let kids;
+    if (isParentUser(user)) {
+      const kidsSnap = await getDocs(collection(db, "kids"));
+      kids = [];
+      kidsSnap.forEach(docSnap => {
+        const kid = { kidId: docSnap.id, ...docSnap.data() };
+        if (kid.active !== false) kids.push(kid);
+      });
+    } else {
+      kids = await getPublicKids();
+    }
+    kids.sort((a, b) =>
+      String(a.name || a.kidId).localeCompare(String(b.name || b.kidId))
+    );
 
     document.body.innerHTML = `
       <main class="app">
@@ -545,7 +651,7 @@ async function loadUserDashboard(user = auth.currentUser) {
 async function loadChildSelector() {
   document.body.innerHTML = `<main class="app"><section class="card"><p>Loading profiles...</p></section></main>`;
   try {
-    const kids = await getAllKids();
+    const kids = await getPublicKids();
     const activeKids = kids.filter(kid => kid.active !== false);
     document.body.innerHTML = `
       <main class="app">
@@ -604,21 +710,38 @@ async function hashPin(pin) {
 }
 
 async function loadKidEntry(kidId) {
-  if (isKidUnlocked(kidId)) {
-    await loadKidDashboard(kidId);
-    return;
-  }
-
   try {
-    const kidSnap = await getDoc(doc(db, "kids", kidId));
-    if (!kidSnap.exists()) { showError("Profile not found: " + kidId); return; }
-    const kid = { kidId, ...kidSnap.data() };
+    const user = auth.currentUser || await waitForAuthUser();
+
+    if (isParentUser(user)) {
+      sessionStorage.setItem(KID_UNLOCK_KEY, kidId);
+      sessionStorage.setItem(KID_UNLOCK_TIME_KEY, String(Date.now()));
+      await loadKidDashboard(kidId);
+      return;
+    }
+
+    const identity = await getChildIdentity(user);
+    if (identity?.kidId === kidId) {
+      sessionStorage.setItem(KID_UNLOCK_KEY, kidId);
+      sessionStorage.setItem(KID_UNLOCK_TIME_KEY, String(Date.now()));
+      await loadKidDashboard(kidId);
+      return;
+    }
+
+    if (user) await signOut(auth);
+
+    const profiles = await getPublicKids();
+    const kid = profiles.find(profile => profile.kidId === kidId);
+    if (!kid) {
+      showError("Profile not found: " + kidId);
+      return;
+    }
 
     document.body.innerHTML = `
       <main class="app">
         <header class="hero compact"><div class="logo character-logo">${renderCharacterThumbnail(kid)}</div><h1>${escapeHtml(kid.name || kidId)}</h1><p>Enter your 4-digit PIN</p></header>
         <section class="card form-card">
-          ${kid.pinHash ? `
+          ${kid.pinConfigured ? `
             <div class="form-field"><label for="kidPin">PIN</label><input id="kidPin" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off"></div>
             <button id="unlockKidBtn" type="button">Enter the Realm</button>
             <p id="pinMessage" aria-live="polite"></p>`
@@ -627,7 +750,7 @@ async function loadKidEntry(kidId) {
         </section>
       </main>`;
 
-    document.getElementById('backHomeBtn').addEventListener('click', () => {
+    document.getElementById("backHomeBtn").addEventListener("click", () => {
       sessionStorage.removeItem(KID_UNLOCK_KEY);
       sessionStorage.removeItem(KID_UNLOCK_TIME_KEY);
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -635,33 +758,49 @@ async function loadKidEntry(kidId) {
     });
 
     const unlock = async () => {
-      const input = document.getElementById('kidPin');
-      const message = document.getElementById('pinMessage');
-      const pin = input?.value.trim() || '';
-      if (!/^\d{4}$/.test(pin)) { message.textContent = 'Enter a 4-digit PIN.'; return; }
-      const security = getPinSecurity(kidId);
-      if (security.lockedUntil > Date.now()) {
-        const minutes = Math.ceil((security.lockedUntil - Date.now()) / 60000);
-        message.textContent = `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`;
+      const input = document.getElementById("kidPin");
+      const message = document.getElementById("pinMessage");
+      const pin = input?.value.trim() || "";
+      if (!/^\d{4}$/.test(pin)) {
+        message.textContent = "Enter a 4-digit PIN.";
         return;
       }
-      if (await hashPin(pin) !== kid.pinHash) {
-        const attempts = Number(security.attempts || 0) + 1;
-        const lockedUntil = attempts >= PIN_MAX_ATTEMPTS ? Date.now() + PIN_LOCK_MINUTES * 60000 : 0;
-        setPinSecurity(kidId, { attempts: lockedUntil ? 0 : attempts, lockedUntil });
-        input.value = '';
-        message.textContent = lockedUntil
-          ? `Too many attempts. Locked for ${PIN_LOCK_MINUTES} minutes.`
-          : `That PIN is not correct. ${PIN_MAX_ATTEMPTS - attempts} attempt${PIN_MAX_ATTEMPTS - attempts === 1 ? '' : 's'} left.`;
-        return;
+
+      const button = document.getElementById("unlockKidBtn");
+      button.disabled = true;
+      message.textContent = "Checking PIN...";
+
+      try {
+        const result = await loginChildCall({ kidId, pin });
+        await signInWithCustomToken(auth, result.data.token);
+        clearPinSecurity(kidId);
+        sessionStorage.setItem(KID_UNLOCK_KEY, kidId);
+        sessionStorage.setItem(KID_UNLOCK_TIME_KEY, String(Date.now()));
+        await loadKidDashboard(kidId);
+      } catch (err) {
+        input.value = "";
+        const code = String(err?.code || "");
+        if (code.includes("resource-exhausted")) {
+          message.textContent = "Too many attempts. Try again in 15 minutes.";
+        } else if (code.includes("permission-denied")) {
+          message.textContent = "That PIN is not correct.";
+          } else {
+            const errorCode = String(err?.code || "unknown");
+            const errorMessage = String(err?.message || "No error message");
+
+            message.textContent =
+              `Sign-in failed: ${errorCode} — ${errorMessage}`;
+
+            console.error("Child sign-in failed:", err);
+          }
+        button.disabled = false;
       }
-      clearPinSecurity(kidId);
-      sessionStorage.setItem(KID_UNLOCK_KEY, kidId);
-      sessionStorage.setItem(KID_UNLOCK_TIME_KEY, String(Date.now()));
-      await loadKidDashboard(kidId);
     };
-    document.getElementById('unlockKidBtn')?.addEventListener('click', unlock);
-    document.getElementById('kidPin')?.addEventListener('keydown', e => { if (e.key === 'Enter') unlock(); });
+
+    document.getElementById("unlockKidBtn")?.addEventListener("click", unlock);
+    document.getElementById("kidPin")?.addEventListener("keydown", event => {
+      if (event.key === "Enter") unlock();
+    });
   } catch (err) {
     showError("Could not open profile: " + err.message);
   }
@@ -904,13 +1043,16 @@ async function refreshAllStreaks() {
 ------------------------------------------------- */
 
 async function getAllKids() {
+  if (!isParentUser(auth.currentUser)) return getPublicKids();
   const snap = await getDocs(collection(db, "kids"));
   const kids = [];
   snap.forEach(d => {
     const kid = { kidId: d.id, ...d.data() };
     if (kid.active !== false) kids.push(kid);
   });
-  return kids.sort((a, b) => String(a.name || a.kidId).localeCompare(String(b.name || b.kidId)));
+  return kids.sort((a, b) =>
+    String(a.name || a.kidId).localeCompare(String(b.name || b.kidId))
+  );
 }
 
 async function getAllSubmissions() {
@@ -938,7 +1080,7 @@ async function getTodayHistory() {
 }
 
 async function loadKidDashboard(kidId) {
-  if (!isKidUnlocked(kidId)) {
+  if (!await userCanAccessKid(kidId)) {
     await loadKidEntry(kidId);
     return;
   }
@@ -946,8 +1088,10 @@ async function loadKidDashboard(kidId) {
   document.body.innerHTML = `<main class="app"><header class="hero"><div class="logo">⚔️</div><h1>Loading...</h1><p>Gathering today's quests...</p></header></main>`;
 
   try {
-    await resetDailyQuestsIfNeeded();
-    await refreshAllStreaks();
+    if (isParentUser(auth.currentUser)) {
+      await resetDailyQuestsIfNeeded();
+      await refreshAllStreaks();
+    }
     const [kidSnap, questSnap, kids, submissions, history] = await Promise.all([
       getDoc(doc(db, "kids", kidId)),
       getDocs(collection(db, "quests")),
@@ -1047,6 +1191,7 @@ function renderDashboard(kid, mainQuests, sideQuests, allKids) {
       return;
     }
 
+    await signOut(auth);
     window.history.replaceState({}, document.title, `?kid=${encodeURIComponent(kid.kidId)}`);
     await loadKidEntry(kid.kidId);
   });
@@ -1716,7 +1861,7 @@ async function loadFamilyAccounts(user) {
           ${kids.map(kid => `
             <div class="quest">
               <div class="quest-icon character-quest-icon">${renderCharacterThumbnail(kid)}</div>
-              <div class="quest-info"><strong>${escapeHtml(kid.name || kid.kidId)}</strong><span>${escapeHtml(kid.kidId)} • ${kid.pinHash ? 'PIN set' : 'PIN not set'}</span><small class="status ${kid.active === false ? 'status-pending' : 'status-ready'}">${kid.active === false ? 'Disabled' : 'Active'}</small></div>
+              <div class="quest-info"><strong>${escapeHtml(kid.name || kid.kidId)}</strong><span>${escapeHtml(kid.kidId)} • ${kid.pinConfigured || kid.pinHash ? 'PIN set' : 'PIN not set'}</span><small class="status ${kid.active === false ? 'status-pending' : 'status-ready'}">${kid.active === false ? 'Disabled' : 'Active'}</small></div>
               <div class="parent-buttons family-account-actions" style="grid-column:1 / -1; display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; width:100%; margin-top:8px;">
                 <button class="edit-kid-btn" type="button" data-kid-id="${escapeAttribute(kid.kidId)}">✏️ Edit Profile</button>
                 <button class="set-pin-btn" type="button" data-kid-id="${escapeAttribute(kid.kidId)}">🔢 Set / Reset PIN</button>
@@ -1814,7 +1959,7 @@ async function loadPinForm(kidId, user) {
     const confirm = document.getElementById('confirmPin').value.trim();
     if (!/^\d{4}$/.test(pin)) { alert('PIN must be exactly 4 digits.'); return; }
     if (pin !== confirm) { alert('The PINs do not match.'); return; }
-    await updateDoc(doc(db, 'kids', kidId), { pinHash: await hashPin(pin), pinUpdatedAt: new Date().toISOString() });
+    await setChildPinCall({ kidId, pin });
     await loadFamilyAccounts(user);
   });
   document.getElementById('cancelPinBtn').addEventListener('click', () => loadFamilyAccounts(user));
@@ -1863,8 +2008,11 @@ function loadNewKidForm(user, kids) {
       classPath: document.getElementById('newKidPath').value.trim(),
       streakMode: document.getElementById('newKidStreakMode').value,
       level: 1, xp: 0, gold: 0, currentStreak: 0, bestStreak: 0, lastStreakDate: '', lifetimeQuests: 0,
-      active: true, pinHash: await hashPin(pin), pinUpdatedAt: new Date().toISOString(), createdAt: new Date().toISOString()
+      active: true,
+      pinConfigured: false,
+      createdAt: new Date().toISOString()
     });
+    await setChildPinCall({ kidId, pin });
     await loadFamilyAccounts(user);
   });
   document.getElementById('cancelKidBtn').addEventListener('click', () => loadFamilyAccounts(user));
@@ -2616,11 +2764,26 @@ function escapeAttribute(value) {
 
 document.addEventListener("DOMContentLoaded", async () => {
   try {
-    if (getRedirectResult) {
-      await getRedirectResult(auth);
+    const redirectResult = await getRedirectResult(auth);
+
+    if (redirectResult?.user) {
+      if (!isParentUser(redirectResult.user)) {
+        await signOut(auth);
+        showError("That Google account is not authorized as a parent.");
+        return;
+      }
+
+      window.history.replaceState(
+        {},
+        document.title,
+        window.location.pathname
+      );
+
+      await loadParentDashboard(redirectResult.user);
+      return;
     }
   } catch (err) {
-    console.error("Redirect login failed:", err);
+    console.error("Redirect sign-in failed:", err);
   }
 
   initializeAuthRouter();

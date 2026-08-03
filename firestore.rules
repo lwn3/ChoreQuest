@@ -1,0 +1,75 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isParent() {
+      return signedIn() &&
+        request.auth.token.email in [
+          "lawrencewnelson3@gmail.com",
+          "anitanelson1987@gmail.com"
+        ];
+    }
+
+    function isChild(kidId) {
+      return signedIn() &&
+        request.auth.token.role == "child" &&
+        request.auth.token.kidId == kidId;
+    }
+
+    match /kids/{kidId} {
+      allow read: if isParent() || isChild(kidId);
+      allow create, delete: if isParent();
+      allow update: if isParent() ||
+        (isChild(kidId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "inventory",
+            "equipment",
+            "inventoryVersion",
+            "classId",
+            "classTitle",
+            "classPath",
+            "classBranch1",
+            "classBranch2",
+            "classChosenAt"
+          ]));
+    }
+
+    match /quests/{questId} {
+      allow read: if signedIn();
+      allow write: if isParent();
+    }
+
+    match /questSubmissions/{submissionId} {
+      allow read: if signedIn();
+      allow create: if signedIn() &&
+        request.auth.token.role == "child" &&
+        request.resource.data.submittedBy == request.auth.token.kidId &&
+        request.resource.data.status == "Pending" &&
+        request.resource.data.participantIds is list &&
+        request.auth.token.kidId in
+          request.resource.data.participantIds;
+      allow update, delete: if isParent();
+    }
+
+    match /questHistory/{historyId} {
+      allow read: if signedIn();
+      allow write: if isParent();
+    }
+
+    match /childAuth/{kidId} {
+      allow read, write: if isParent();
+    }
+
+    match /childLoginSecurity/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if isParent();
+    }
+  }
+}

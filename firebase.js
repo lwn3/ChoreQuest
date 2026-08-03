@@ -18,14 +18,20 @@ import {
   GoogleAuthProvider, 
   signInWithPopup,
   signInWithRedirect,
+  signInWithCustomToken,
   getRedirectResult, 
   signOut, 
   onAuthStateChanged 
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
 
+import {
+  getFunctions,
+  httpsCallable
+} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-functions.js";
+
 const firebaseConfig = {
   apiKey: "AIzaSyDeSI1GanQ0yUXmexvVOzrk3DVbRYqbxqI",
-  authDomain: "chorequest-3a721.firebaseapp.com",
+  authDomain: "chorequest-3a721.web.app",
   projectId: "chorequest-3a721",
   storageBucket: "chorequest-3a721.firebasestorage.app",
   messagingSenderId: "475400353768",
@@ -37,6 +43,7 @@ const db = getFirestore(app);
 // 2. Initialize Auth
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
+const functions = getFunctions(app, "us-central1");
 
 window.ChoreQuestFirebase = {
   db,
@@ -54,8 +61,11 @@ window.ChoreQuestFirebase = {
   auth,
   googleProvider,
   signInWithRedirect,
+  signInWithCustomToken,
   getRedirectResult,
   signInWithPopup,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  functions,
+  httpsCallable
 };
