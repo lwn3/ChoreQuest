@@ -1,7 +1,7 @@
 {
   "appId": "com.yourname.chorequest",
   "appName": "ChoreQuest",
-  "webDir": "www",
+  "webDir": ".",
   "server": {
     "url": "https://chorequest-3a721.web.app/",
     "cleartext": true
