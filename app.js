@@ -2155,137 +2155,19 @@ async function resetDailyQuestsIfNeeded() {
    ADVENTURES AND GUILDMASTER TEST LAB
 ------------------------------------------------- */
 
-const CLASS_COMBAT_PROGRESSION = {
-  warrior: {
-    passive: {level: 1, name: "Battle Hardened", text: "+10% maximum HP.", maxHpMultiplier: 1.10},
-    skills: [
-      {level: 1, id: "power_strike", name: "Power Strike", icon: "💥", cost: 3, kind: "physical", multiplier: 1.8, text: "A heavy physical strike."},
-      {level: 5, id: "armor_break", name: "Armor Break", icon: "🔨", cost: 4, kind: "physical", multiplier: 1.55, armorPierce: 0.55, text: "Ignores much of the enemy's defense."},
-      {level: 10, id: "second_wind", name: "Second Wind", icon: "❤️", cost: 5, healPct: 0.32, text: "Recover 32% of maximum HP."},
-      {level: 15, id: "heroic_strike", name: "Heroic Strike", icon: "⚔️", cost: 7, kind: "physical", multiplier: 2.7, text: "A powerful finishing attack."}
-    ]
-  },
-  rogue: {
-    passive: {level: 1, name: "Opportunist", text: "+7% critical-hit chance.", critBonus: 0.07},
-    skills: [
-      {level: 1, id: "flurry", name: "Flurry", icon: "🗡️", cost: 3, kind: "physical", multiplier: 1.65, critBonus: 0.08, text: "Fast attack with extra critical chance."},
-      {level: 5, id: "shadowstep", name: "Shadowstep", icon: "🌑", cost: 4, kind: "physical", multiplier: 1.35, evasionTurns: 2, text: "Attack and greatly improve dodge for 2 turns."},
-      {level: 10, id: "lucky_stab", name: "Lucky Stab", icon: "🍀", cost: 5, kind: "physical", multiplier: 2.0, critBonus: 0.25, text: "A risky strike with very high critical chance."},
-      {level: 15, id: "phantom_flurry", name: "Phantom Flurry", icon: "👤", cost: 7, kind: "physical", multiplier: 2.55, critBonus: 0.12, text: "A rapid master-level attack."}
-    ]
-  },
-  mage: {
-    passive: {level: 1, name: "Mana Well", text: "+2 maximum SP.", maxSpBonus: 2},
-    skills: [
-      {level: 1, id: "arc_bolt", name: "Arc Bolt", icon: "✨", cost: 3, kind: "magic", multiplier: 1.85, text: "A focused magical blast."},
-      {level: 5, id: "mana_surge", name: "Mana Surge", icon: "💠", cost: 0, spRestore: 4, text: "Restore 4 SP. Does not deal damage."},
-      {level: 10, id: "fireball", name: "Fireball", icon: "🔥", cost: 5, kind: "magic", multiplier: 2.35, text: "Heavy magical damage."},
-      {level: 15, id: "starfall", name: "Starfall", icon: "🌠", cost: 8, kind: "magic", multiplier: 3.0, text: "A master spell with massive damage."}
-    ]
-  },
-  ranger: {
-    passive: {level: 1, name: "Trail Instinct", text: "+5% dodge chance.", dodgeBonus: 0.05},
-    skills: [
-      {level: 1, id: "piercing_shot", name: "Piercing Shot", icon: "🏹", cost: 3, kind: "physical", multiplier: 1.75, armorPierce: 0.45, text: "A shot that cuts through defense."},
-      {level: 5, id: "quick_volley", name: "Quick Volley", icon: "🎯", cost: 4, kind: "physical", multiplier: 1.95, critBonus: 0.08, text: "A fast, accurate volley."},
-      {level: 10, id: "field_mend", name: "Field Mend", icon: "🌿", cost: 5, healPct: 0.28, text: "Recover 28% of maximum HP."},
-      {level: 15, id: "perfect_shot", name: "Perfect Shot", icon: "🏹", cost: 7, kind: "physical", multiplier: 2.65, armorPierce: 0.65, text: "A master shot that largely ignores armor."}
-    ]
-  },
-  guardian: {
-    passive: {level: 1, name: "Protector", text: "Defending reduces damage even further.", guardMultiplier: 0.35},
-    skills: [
-      {level: 1, id: "shield_bash", name: "Shield Bash", icon: "🛡️", cost: 3, kind: "physical", multiplier: 1.55, guardNext: true, text: "Attack and brace for the next hit."},
-      {level: 5, id: "kind_mend", name: "Kind Mend", icon: "💚", cost: 4, healPct: 0.34, kindnessHeal: true, text: "Heal yourself; Kindness improves the effect."},
-      {level: 10, id: "bulwark", name: "Bulwark", icon: "🏰", cost: 5, guardTurns: 2, text: "Greatly reduce damage for 2 turns."},
-      {level: 15, id: "guardian_smite", name: "Guardian Smite", icon: "🌟", cost: 7, kind: "physical", multiplier: 2.35, guardNext: true, text: "Heavy damage while protecting yourself."}
-    ]
-  },
-  royal: {
-    passive: {level: 1, name: "Fortune's Favor", text: "+10% Gold and better loot rolls.", goldMultiplier: 1.10, lootBonus: 0.10},
-    skills: [
-      {level: 1, id: "radiant_burst", name: "Radiant Burst", icon: "👑", cost: 3, kind: "magic", multiplier: 1.75, text: "A bright magical attack."},
-      {level: 5, id: "rally", name: "Rally", icon: "📣", cost: 4, healPct: 0.18, spRestore: 2, text: "Recover HP and 2 SP."},
-      {level: 10, id: "fortune_strike", name: "Fortune Strike", icon: "💎", cost: 5, kind: "magic", multiplier: 2.1, critBonus: 0.20, text: "A high-critical magical strike."},
-      {level: 15, id: "royal_decree", name: "Royal Decree", icon: "✨", cost: 7, kind: "magic", multiplier: 2.6, healPct: 0.12, text: "Heavy damage and a small heal."}
-    ]
-  }
-};
-
-function classCombatProgression(classId) {
-  return CLASS_COMBAT_PROGRESSION[classId] || CLASS_COMBAT_PROGRESSION.warrior;
-}
-
-const CLASS_BRANCH_PERKS = {
-  knight: {name: "Knight Training", text: "+8% maximum HP.", maxHpMultiplier: 1.08},
-  berserker: {name: "Berserker Fury", text: "+10% physical damage.", physicalDamageBonus: 0.10},
-  paladin: {name: "Paladin Grace", text: "Healing is 15% stronger.", healBonus: 0.15},
-  "dragon-knight": {name: "Dragon Blood", text: "+5% critical chance.", critBonus: 0.05},
-  champion: {name: "Champion's Force", text: "+12% physical damage.", physicalDamageBonus: 0.12},
-  warlord: {name: "Warlord's Presence", text: "+12% Gold from battles.", goldMultiplier: 1.12},
-
-  scout: {name: "Scout Reflexes", text: "+5% dodge chance.", dodgeBonus: 0.05},
-  trickster: {name: "Trickster's Luck", text: "+6% critical chance.", critBonus: 0.06},
-  pathfinder: {name: "Pathfinder's Eye", text: "Better equipment drop chance.", lootBonus: 0.10},
-  "shadow-runner": {name: "Shadow Runner", text: "+10% physical damage.", physicalDamageBonus: 0.10},
-  "illusion-rogue": {name: "Illusion Feint", text: "+7% dodge chance.", dodgeBonus: 0.07},
-  "fortune-master": {name: "Fortune Master", text: "Better rarity rolls and +10% Gold.", lootBonus: 0.12, goldMultiplier: 1.10},
-
-  elementalist: {name: "Elemental Force", text: "+10% magic damage.", magicDamageBonus: 0.10},
-  enchanter: {name: "Deep Mana", text: "+2 maximum SP.", maxSpBonus: 2},
-  "fire-mage": {name: "Burning Power", text: "+15% magic damage.", magicDamageBonus: 0.15},
-  "frost-mage": {name: "Cold Focus", text: "+5% dodge and +1 maximum SP.", dodgeBonus: 0.05, maxSpBonus: 1},
-  illusionist: {name: "Mirage", text: "+8% dodge chance.", dodgeBonus: 0.08},
-  "rune-master": {name: "Rune Mastery", text: "+3 maximum SP.", maxSpBonus: 3},
-
-  "beast-friend": {name: "Beast Bond", text: "Companion abilities trigger more often.", companionProcBonus: 0.08},
-  "forest-warden": {name: "Forest Warden", text: "+8% maximum HP and stronger healing.", maxHpMultiplier: 1.08, healBonus: 0.08},
-  "storm-ranger": {name: "Storm Aim", text: "+8% critical chance.", critBonus: 0.08},
-  "beast-master": {name: "Beast Mastery", text: "Companion abilities trigger much more often.", companionProcBonus: 0.14},
-  "spirit-ranger": {name: "Spirit Bond", text: "+2 maximum SP and stronger healing.", maxSpBonus: 2, healBonus: 0.10},
-
-  protector: {name: "Protector Training", text: "+10% maximum HP.", maxHpMultiplier: 1.10},
-  healer: {name: "Healing Hands", text: "Healing is 18% stronger.", healBonus: 0.18},
-  sentinel: {name: "Sentinel Wall", text: "+12% maximum HP.", maxHpMultiplier: 1.12},
-  "royal-guard": {name: "Royal Guard", text: "+5% dodge and stronger guarding.", dodgeBonus: 0.05},
-  "light-keeper": {name: "Light Keeper", text: "+2 maximum SP and stronger healing.", maxSpBonus: 2, healBonus: 0.12},
-  "heart-mender": {name: "Heart Mender", text: "Healing is 25% stronger.", healBonus: 0.25},
-
-  "unicorn-princess": {name: "Unicorn Grace", text: "Healing is 12% stronger.", healBonus: 0.12},
-  "dragon-prince": {name: "Dragon Spirit", text: "+10% magic damage.", magicDamageBonus: 0.10},
-  "rainbow-queen": {name: "Rainbow Fortune", text: "Better rarity rolls.", lootBonus: 0.12},
-  "starlight-guardian": {name: "Starlight Ward", text: "+8% maximum HP and +5% dodge.", maxHpMultiplier: 1.08, dodgeBonus: 0.05},
-  "flame-king": {name: "Flame Crown", text: "+15% magic damage.", magicDamageBonus: 0.15},
-  "dragon-rider": {name: "Dragon Rider", text: "+8% critical chance and +8% Gold.", critBonus: 0.08, goldMultiplier: 1.08}
-};
-
 function combinedCombatPerks(kid) {
-  const base = {...classCombatProgression(kid.classId).passive};
-  [kid.classBranch1, kid.classBranch2].filter(Boolean).forEach(branchId => {
-    const perk = CLASS_BRANCH_PERKS[branchId];
-    if (!perk) return;
-    ["critBonus", "dodgeBonus", "lootBonus", "healBonus", "physicalDamageBonus", "magicDamageBonus", "maxSpBonus", "companionProcBonus"].forEach(key => {
-      if (perk[key]) base[key] = Number(base[key] || 0) + Number(perk[key]);
-    });
-    if (perk.maxHpMultiplier) base.maxHpMultiplier = Number(base.maxHpMultiplier || 1) * Number(perk.maxHpMultiplier);
-    if (perk.goldMultiplier) base.goldMultiplier = Number(base.goldMultiplier || 1) * Number(perk.goldMultiplier);
-  });
-  return base;
+  return aggregatePassivePerks(kid);
 }
 
 function classPerkCards(kid) {
-  const progression = classCombatProgression(kid.classId);
-  const perks = [{...progression.passive, source: "Class perk"}];
-  [kid.classBranch1, kid.classBranch2].filter(Boolean).forEach(branchId => {
-    const perk = CLASS_BRANCH_PERKS[branchId];
-    if (perk) perks.push({...perk, source: "Path perk"});
-  });
-  return perks;
+  return earnedPassivePerks(kid).map(perk => ({
+    ...perk,
+    source: CLASS_DEFINITIONS[perk.classId]?.name || "Class"
+  }));
 }
 
 function unlockedCombatSkills(kid) {
-  const level = Math.max(1, Number(kid.level || 1));
-  return classCombatProgression(kid.classId).skills.filter(skill => level >= skill.level);
+  return learnedActiveSkills(kid, kid.classId);
 }
 
 function companionBattleEffects(kid) {
