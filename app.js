@@ -434,12 +434,29 @@ function streakFoodIdForKid(kid) {
   return String(kid?.name || "").trim().toLowerCase() === "autumn" ? "streak_ramen" : "streak_bubble_gum";
 }
 
+function questFoodTier(quest) {
+  const saved = String(quest?.foodTier || "").toLowerCase();
+  if (["small", "medium", "large"].includes(saved)) return saved;
+  const difficulty = Number(quest?.xp || 0);
+  if (difficulty >= 60) return "large";
+  if (difficulty >= 30) return "medium";
+  return "small";
+}
+
+function questFoodTierLabel(quest) {
+  return {
+    small: "Small snack",
+    medium: "Medium snack",
+    large: "Large snack"
+  }[questFoodTier(quest)];
+}
+
 function questFoodRewardId(kid, quest, isFullReward = true) {
   const ids = regularFoodIdsForKid(kid);
   if (!isFullReward) return ids[0];
-  const difficulty = Number(quest?.xp || 0);
-  if (difficulty >= 60) return ids[2];
-  if (difficulty >= 30) return ids[1];
+  const tier = questFoodTier(quest);
+  if (tier === "large") return ids[2];
+  if (tier === "medium") return ids[1];
   return ids[0];
 }
 
@@ -1831,8 +1848,6 @@ function renderClassScreen(kid) {
 
 function questCard(quest, currentKidId) {
   const isMain = quest.kidId === currentKidId;
-  const displayXp = isMain ? Number(quest.xp || 0) : Math.round(Number(quest.xp || 0) / 2);
-  const displayGold = isMain ? Number(quest.gold || 0) : Math.round(Number(quest.gold || 0) / 2);
   return `
     <div class="quest">
       <div class="quest-icon">${quest.completedToday ? "✅" : iconForQuest(quest.name || "")}</div>
@@ -1885,8 +1900,7 @@ async function openQuestSubmission(choreId, currentKidId, allKids) {
         scheduleType: getQuestScheduleType(quest),
         submittedAt: new Date().toISOString(),
         isSideQuest: quest.kidId !== currentKidId,
-        fullXp: Number(quest.xp || 0),
-        fullGold: Number(quest.gold || 0)
+        foodTier: questFoodTier(quest)
       });
       showToast(getCompletionMessage());
       setTimeout(() => loadKidDashboard(currentKidId), 600);
@@ -2782,8 +2796,7 @@ async function loadQuestManager(user) {
                                     quest.kidId ||
                                     "Unassigned"
                                 ) +
-                                ` • +${Number(quest.xp || 0)} XP` +
-                                ` • +${Number(quest.gold || 0)} Gold` +
+                                ` • ${escapeHtml(questFoodTierLabel(quest))}` +
                                 ` • ${escapeHtml(statusLabel(quest.status))}`
                             }
                           </small>
@@ -3044,36 +3057,12 @@ async function loadEditQuestForm(questId) {
           )}
 
           ${formField(
-            "XP Reward",
-            `<input
-              id="questXp"
-              type="number"
-              min="0"
-              value="${Number(quest.xp || 0)}"
-              style="width:100%; box-sizing:border-box; padding:10px;"
-            >`
-          )}
-
-          ${formField(
-            "Gold Reward",
-            `<input
-              id="questGold"
-              type="number"
-              min="0"
-              value="${Number(quest.gold || 0)}"
-              style="width:100%; box-sizing:border-box; padding:10px;"
-            >`
-          )}
-
-          ${formField(
-            "Helper Bonus",
-            `<input
-              id="questHelperBonus"
-              type="number"
-              min="0"
-              value="${Number(quest.helperBonus || 0)}"
-              style="width:100%; box-sizing:border-box; padding:10px;"
-            >`
+            "Adventure Food Reward",
+            `<select id="questFoodTier" style="width:100%; box-sizing:border-box; padding:10px;">
+              <option value="small" ${questFoodTier(quest) === "small" ? "selected" : ""}>Small snack</option>
+              <option value="medium" ${questFoodTier(quest) === "medium" ? "selected" : ""}>Medium snack</option>
+              <option value="large" ${questFoodTier(quest) === "large" ? "selected" : ""}>Large snack</option>
+            </select>`
           )}
 
           <label style="display:flex; align-items:center; gap:8px;">
@@ -3129,15 +3118,7 @@ async function loadEditQuestForm(questId) {
             time:
               document.getElementById("questTime").value.trim() ||
               "Anytime",
-            xp: Number(
-              document.getElementById("questXp").value || 0
-            ),
-            gold: Number(
-              document.getElementById("questGold").value || 0
-            ),
-            helperBonus: Number(
-              document.getElementById("questHelperBonus").value || 0
-            ),
+            foodTier: document.getElementById("questFoodTier").value,
             active: document.getElementById("questActive").checked,
             allowHelpers: document.getElementById("questAllowHelpers").checked,
             updatedAt: new Date().toISOString()
@@ -3240,36 +3221,12 @@ async function loadNewQuestForm() {
           )}
 
           ${formField(
-            "XP Reward",
-            `<input
-              id="questXp"
-              type="number"
-              min="0"
-              value="5"
-              style="width:100%; box-sizing:border-box; padding:10px;"
-            >`
-          )}
-
-          ${formField(
-            "Gold Reward",
-            `<input
-              id="questGold"
-              type="number"
-              min="0"
-              value="5"
-              style="width:100%; box-sizing:border-box; padding:10px;"
-            >`
-          )}
-
-          ${formField(
-            "Helper Bonus",
-            `<input
-              id="questHelperBonus"
-              type="number"
-              min="0"
-              value="3"
-              style="width:100%; box-sizing:border-box; padding:10px;"
-            >`
+            "Adventure Food Reward",
+            `<select id="questFoodTier" style="width:100%; box-sizing:border-box; padding:10px;">
+              <option value="small">Small snack</option>
+              <option value="medium" selected>Medium snack</option>
+              <option value="large">Large snack</option>
+            </select>`
           )}
 
           <label style="display:flex; align-items:center; gap:8px;">
@@ -3321,15 +3278,10 @@ async function loadNewQuestForm() {
             time:
               document.getElementById("questTime").value.trim() ||
               "Anytime",
-            xp: Number(
-              document.getElementById("questXp").value || 0
-            ),
-            gold: Number(
-              document.getElementById("questGold").value || 0
-            ),
-            helperBonus: Number(
-              document.getElementById("questHelperBonus").value || 0
-            ),
+            foodTier: document.getElementById("questFoodTier").value,
+            xp: 0,
+            gold: 0,
+            helperBonus: 0,
             active: document.getElementById("questActive").checked,
             allowHelpers: document.getElementById("questAllowHelpers").checked,
             archived: false,
