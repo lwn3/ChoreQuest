@@ -3411,62 +3411,39 @@ body.kid-theme .toast {
   right: 10px;
   z-index: 10000;
   display: grid;
-  grid-template-columns: repeat(3, 34px);
-  align-items: center;
-  width: 102px;
-  height: 38px;
-  padding: 2px;
-  background: rgba(12, 18, 36, .52);
+  place-items: center;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  color: #ffffff;
+  background: rgba(138, 99, 255, .94);
   border: 0;
-  border-radius: 999px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.14);
-  backdrop-filter: blur(16px);
-}
-
-.theme-slider-indicator {
-  position: absolute;
-  left: 2px;
-  top: 2px;
-  width: 34px;
-  height: 34px;
   border-radius: 50%;
-  background: rgba(138,99,255,.92);
-  box-shadow: 0 5px 14px rgba(69,60,170,.28);
-  transition: transform 180ms ease;
-  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(53, 46, 150, .28);
+  backdrop-filter: blur(14px);
+  touch-action: none;
+  user-select: none;
 }
 
-.theme-mode-control[data-selected="auto"] .theme-slider-indicator {
-  transform: translateX(34px);
+.theme-mode-control:hover {
+  transform: none;
+  filter: brightness(1.03);
 }
 
-.theme-mode-control[data-selected="night"] .theme-slider-indicator {
-  transform: translateX(68px);
+.theme-mode-control:active {
+  transform: scale(.97);
 }
 
-.theme-mode-control button {
-  position: relative;
-  z-index: 1;
+.theme-knob-icon {
   display: grid;
   place-items: center;
-  width: 34px;
-  min-width: 34px;
-  height: 34px;
-  min-height: 34px;
-  padding: 0;
-  color: #cbd5eb;
-  font-size: .82rem;
+  width: 100%;
+  height: 100%;
+  font-size: .92rem;
   font-weight: 900;
-  background: transparent;
-  border: 0;
-  border-radius: 50%;
-  box-shadow: none;
-}
-
-.theme-mode-control button.active {
-  color: #fff;
-  background: transparent;
-  box-shadow: none;
+  line-height: 1;
 }
 
 body.day-theme {
@@ -3566,21 +3543,11 @@ body.day-theme .account-header {
 }
 
 body.day-theme .theme-mode-control {
-  background: rgba(255,255,255,.66);
-}
-
-body.day-theme .theme-mode-control button {
-  color: #64718d;
-}
-
-body.day-theme .theme-mode-control button.active {
-  color: #fff;
-  background: transparent;
-}
-
-body.day-theme .theme-slider-indicator {
+  color: #ffffff;
   background: #6f56e8;
 }
+
+
 
 body.day-theme input,
 body.day-theme select,
@@ -3647,12 +3614,9 @@ body.night-theme .quest-locked {
   .theme-mode-control {
     top: max(7px, env(safe-area-inset-top));
     right: 7px;
-  }
-
-  .theme-mode-control button {
-    width: 32px;
-    min-width: 32px;
-    height: 32px;
-    min-height: 32px;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    min-height: 40px;
   }
 }
