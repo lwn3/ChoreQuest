@@ -1442,9 +1442,27 @@ function renderClassScreen(kid) {
           <div><span>Level</span><strong>${level}</strong></div>
           <div><span>HP</span><strong>${stats.hp}</strong></div>
           <div><span>Gold</span><strong>${Number(kid.gold || 0)}</strong></div>
-          <div><span>Inventory</span><strong>${inventory.length}</strong></div>
+          <div><span>SP</span><strong>${Number(kid.sp || 0)}</strong></div>
           <div><span>Rebirths</span><strong>${Number(kid.rebirths || 0)}</strong></div>
         </div>
+      </section>
+
+      <section class="card jrpg-menu-card attribute-overview-card">
+        <div class="jrpg-section-heading">
+          <div><h2>Attributes</h2><p>Level growth plus equipment bonuses.</p></div>
+        </div>
+        <div class="attribute-overview">
+          <div class="stat-radar-wrap">
+            ${radarChartSvg(stats)}
+            <div class="stat-radar-legend"><span class="current">Current build</span></div>
+          </div>
+        </div>
+        <div class="jrpg-stat-grid">${statRows}</div>
+      </section>
+
+      <section class="card"><h2>Abilities & Spells</h2>
+        ${unlocked.map(a => `<div class="quest"><div class="quest-icon">✨</div><div class="quest-info"><strong>${escapeHtml(a.name)}</strong><span>Unlocked at Level ${a.level}</span><small class="status status-approved">${escapeHtml(a.text)}</small></div></div>`).join("")}
+        ${locked.map(a => `<div class="quest"><div class="quest-icon">🔒</div><div class="quest-info"><strong>${escapeHtml(a.name)}</strong><span>Unlocks at Level ${a.level}</span></div></div>`).join("")}
       </section>
 
       <section class="card loadout-card">
@@ -1474,26 +1492,6 @@ function renderClassScreen(kid) {
           <span>☝️</span>
           <p>Select an equipment slot above.</p>
         </div>
-      </section>
-
-      <section class="card jrpg-menu-card attribute-overview-card">
-        <div class="jrpg-section-heading">
-          <div><h2>Attributes</h2><p>Level growth plus equipment bonuses.</p></div>
-          <span>HP ${stats.hp}</span>
-        </div>
-        <div class="attribute-overview">
-          <div class="stat-radar-wrap">
-            ${radarChartSvg(stats)}
-            <div class="stat-radar-legend"><span class="current">Current build</span></div>
-          </div>
-          <div class="stat-number-list">${statComparisonTableHtml(stats)}</div>
-        </div>
-        <div class="jrpg-stat-grid">${statRows}</div>
-      </section>
-
-      <section class="card"><h2>Abilities & Spells</h2>
-        ${unlocked.map(a => `<div class="quest"><div class="quest-icon">✨</div><div class="quest-info"><strong>${escapeHtml(a.name)}</strong><span>Unlocked at Level ${a.level}</span><small class="status status-approved">${escapeHtml(a.text)}</small></div></div>`).join("")}
-        ${locked.map(a => `<div class="quest"><div class="quest-icon">🔒</div><div class="quest-info"><strong>${escapeHtml(a.name)}</strong><span>Unlocks at Level ${a.level}</span></div></div>`).join("")}
       </section>
 
       ${canChooseBranch1 ? `<section class="card"><h2>Choose Your Level 5 Path</h2>${def.branch1.map(b => `<button class="choose-branch1-btn" data-branch-id="${b.id}" type="button" style="width:100%;margin-bottom:10px;">${b.icon} ${escapeHtml(b.name)}</button>`).join("")}</section>` : ""}
