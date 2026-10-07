@@ -53,7 +53,7 @@ function cleanPin(value) {
   return pin;
 }
 
-exports.listChildProfiles = onCall({maxInstances: 3}, async () => {
+exports.listChildProfiles = onCall({maxInstances: 3, invoker: "public"}, async () => {
   const snapshot = await db.collection("kids").get();
   const profiles = [];
 
@@ -77,7 +77,7 @@ exports.listChildProfiles = onCall({maxInstances: 3}, async () => {
   return {profiles};
 });
 
-exports.loginChild = onCall({maxInstances: 3}, async (request) => {
+exports.loginChild = onCall({maxInstances: 3, invoker: "public"}, async (request) => {
   const kidId = cleanKidId(request.data?.kidId);
   const pin = cleanPin(request.data?.pin);
   const ip = String(request.rawRequest?.ip || "unknown");
@@ -275,7 +275,7 @@ function combatPower(stats) {
   );
 }
 
-exports.consumeFood = onCall({maxInstances: 3}, async (request) => {
+exports.consumeFood = onCall({maxInstances: 3, invoker: "public"}, async (request) => {
   const kidId = authorizedKidId(request);
   const foodId = String(request.data?.foodId || "");
   const energyValue = FOOD_ENERGY[foodId];
@@ -309,7 +309,7 @@ exports.consumeFood = onCall({maxInstances: 3}, async (request) => {
   return result;
 });
 
-exports.runAdventure = onCall({maxInstances: 3}, async (request) => {
+exports.runAdventure = onCall({maxInstances: 3, invoker: "public"}, async (request) => {
   const kidId = authorizedKidId(request);
   const adventureId = String(request.data?.adventureId || "");
   const adventure = ADVENTURES[adventureId];
@@ -448,7 +448,7 @@ function publicBattleState(data, sessionId) {
   };
 }
 
-exports.startBattle = onCall({maxInstances: 3}, async (request) => {
+exports.startBattle = onCall({maxInstances: 3, invoker: "public"}, async (request) => {
   try {
     const kidId = authorizedKidId(request);
     const adventureId = String(request.data?.adventureId || "");
@@ -536,7 +536,7 @@ exports.startBattle = onCall({maxInstances: 3}, async (request) => {
   }
 });
 
-exports.battleAction = onCall({maxInstances: 3}, async (request) => {
+exports.battleAction = onCall({maxInstances: 3, invoker: "public"}, async (request) => {
   const kidId = authorizedKidId(request);
   const sessionId = String(request.data?.sessionId || "");
   const action = String(request.data?.action || "");
