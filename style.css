@@ -3620,3 +3620,247 @@ body.night-theme .quest-locked {
     min-height: 40px;
   }
 }
+
+
+/* =========================================================
+   CLASS PROGRESSION AND BATTLE REWARDS
+========================================================= */
+
+.class-perk-list,
+.class-skill-list {
+  display: grid;
+  gap: 8px;
+}
+
+.class-perk-list {
+  margin-bottom: 14px;
+}
+
+.class-perk-row,
+.class-skill-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px 11px;
+  background: rgba(255,255,255,.035);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 13px;
+}
+
+.class-perk-row > span,
+.class-skill-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  font-size: 1.2rem;
+  background: rgba(138,99,255,.10);
+  border-radius: 12px;
+}
+
+.class-perk-row small,
+.class-perk-row strong,
+.class-perk-row p,
+.class-skill-row strong,
+.class-skill-row span,
+.class-skill-row small {
+  display: block;
+}
+
+.class-perk-row small {
+  margin-bottom: 2px;
+  color: #9eadd0;
+  font-size: .64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.class-perk-row strong,
+.class-skill-row strong {
+  margin-bottom: 3px;
+}
+
+.class-perk-row p,
+.class-skill-row small {
+  margin: 0;
+  color: #aebbd8;
+  font-size: .73rem;
+  line-height: 1.35;
+}
+
+.class-skill-row span {
+  margin-bottom: 3px;
+  color: #8fa3c8;
+  font-size: .67rem;
+  font-weight: 800;
+}
+
+.class-skill-row.locked {
+  opacity: .55;
+}
+
+.battle-trait {
+  display: inline-block;
+  margin: -2px 0 8px;
+  padding: 3px 7px;
+  color: #c8d4ea;
+  font-size: .62rem;
+  font-weight: 800;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 999px;
+}
+
+.battle-companion-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: -2px 0 12px;
+}
+
+.battle-companion-strip span {
+  padding: 6px 9px;
+  color: #cdd8ec;
+  font-size: .7rem;
+  font-weight: 800;
+  background: rgba(138,99,255,.08);
+  border: 1px solid rgba(138,99,255,.16);
+  border-radius: 999px;
+}
+
+.battle-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.battle-action-btn.skill {
+  min-height: 100px;
+}
+
+.battle-action-btn.skill small {
+  line-height: 1.3;
+}
+
+.battle-reward-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.battle-reward-grid > div {
+  padding: 10px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 12px;
+}
+
+.battle-reward-grid span,
+.battle-reward-grid strong {
+  display: block;
+}
+
+.battle-reward-grid span {
+  margin-bottom: 3px;
+  color: #9eadd0;
+  font-size: .64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.battle-reward-grid strong {
+  font-size: 1.05rem;
+}
+
+.level-up-banner {
+  margin: 10px 0;
+  padding: 10px 12px;
+  color: #fff2ad;
+  font-weight: 900;
+  background: rgba(255,211,108,.10);
+  border: 1px solid rgba(255,211,108,.22);
+  border-radius: 12px;
+}
+
+.battle-loot-drop {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  margin: 10px 0;
+  padding: 10px;
+  text-align: left;
+  background: rgba(78,224,204,.06);
+  border: 1px solid rgba(78,224,204,.16);
+  border-radius: 13px;
+}
+
+.battle-loot-drop small,
+.battle-loot-drop strong,
+.battle-loot-drop span {
+  display: block;
+}
+
+.battle-loot-drop small {
+  color: #8fa3c8;
+  font-size: .64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.battle-loot-drop strong {
+  margin: 2px 0;
+}
+
+.battle-loot-drop span {
+  color: #aebbd8;
+  font-size: .72rem;
+}
+
+.battle-no-drop {
+  color: #8fa3c8;
+  font-size: .76rem;
+}
+
+body.day-theme .class-perk-row,
+body.day-theme .class-skill-row,
+body.day-theme .battle-reward-grid > div,
+body.day-theme .battle-loot-drop {
+  background: rgba(79,101,145,.035);
+  border-color: rgba(37,57,92,.09);
+}
+
+body.day-theme .class-perk-row p,
+body.day-theme .class-skill-row small,
+body.day-theme .battle-loot-drop span,
+body.day-theme .battle-no-drop {
+  color: #68758f;
+}
+
+body.day-theme .class-perk-row small,
+body.day-theme .class-skill-row span,
+body.day-theme .battle-reward-grid span,
+body.day-theme .battle-loot-drop small {
+  color: #7886a3;
+}
+
+body.day-theme .battle-trait,
+body.day-theme .battle-companion-strip span {
+  color: #4d5d7a;
+  background: rgba(111,86,232,.05);
+  border-color: rgba(111,86,232,.12);
+}
+
+@media (max-width: 520px) {
+  .battle-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .battle-action-btn.skill {
+    min-height: 68px;
+  }
+
+  .battle-reward-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
