@@ -449,31 +449,45 @@ function publicBattleState(data, sessionId) {
 }
 
 exports.startBattle = onCall({maxInstances: 3}, async (request) => {
-  const kidId = authorizedKidId(request);
-  const adventureId = String(request.data?.adventureId || "");
-  const adventure = ADVENTURES[adventureId];
-  if (!adventure) throw new HttpsError("invalid-argument", "Unknown adventure.");
+  try {
+    const kidId = authorizedKidId(request);
+    const adventureId = String(request.data?.adventureId || "");
+    const adventure = ADVENTURES[adventureId];
+    if (!adventure) {
+      throw new HttpsError("invalid-argument", "Unknown adventure.");
+    }
 
-  const kidRef = db.collection("kids").doc(kidId);
-  const battleRef = db.collection("battleSessions").doc();
-  const today = chicagoDateKey();
+    const kidRef = db.collection("kids").doc(kidId);
+    const battleRef = db.collection("battleSessions").doc();
+    const today = chicagoDateKey();
+    const kidSnap = await kidRef.get();
 
-  const result = await db.runTransaction(async (transaction) => {
-    const kidSnap = await transaction.get(kidRef);
-    if (!kidSnap.exists) throw new HttpsError("not-found", "Adventurer not found.");
+    if (!kidSnap.exists) {
+      throw new HttpsError("not-found", "Adventurer not found.");
+    }
 
     const kid = kidSnap.data();
     const energy = Math.min(MAX_ENERGY, Number(kid.energy ?? MAX_ENERGY));
-    const sleepiness = kid.sleepinessDate === today ? Number(kid.sleepiness || 0) : 0;
+    const sleepiness =
+      kid.sleepinessDate === today ? Number(kid.sleepiness || 0) : 0;
+
     if (energy < adventure.energy) {
-      throw new HttpsError("failed-precondition", "Not enough energy. Eat some quest food first.");
+      throw new HttpsError(
+        "failed-precondition",
+        "Not enough energy. Eat some quest food first."
+      );
     }
+
     if (sleepiness + adventure.sleepiness > MAX_SLEEPINESS) {
-      throw new HttpsError("failed-precondition", "Too sleepy to adventure again today.");
+      throw new HttpsError(
+        "failed-precondition",
+        "Too sleepy to adventure again today."
+      );
     }
 
     const profile = battlePlayerProfile(kid);
     const enemy = scaledEnemy(adventureId, profile.level);
+
     const data = {
       kidId,
       adventureId,
@@ -501,17 +515,25 @@ exports.startBattle = onCall({maxInstances: 3}, async (request) => {
       updatedAt: FieldValue.serverTimestamp(),
     };
 
-    transaction.update(kidRef, {
+    const batch = db.batch();
+    batch.update(kidRef, {
       energy: energy - adventure.energy,
       sleepiness: sleepiness + adventure.sleepiness,
       sleepinessDate: today,
       lastAdventureAt: FieldValue.serverTimestamp(),
     });
-    transaction.create(battleRef, data);
-    return publicBattleState(data, battleRef.id);
-  });
+    batch.set(battleRef, data);
+    await batch.commit();
 
-  return result;
+    return publicBattleState(data, battleRef.id);
+  } catch (err) {
+    console.error("startBattle failed", err);
+    if (err instanceof HttpsError) throw err;
+    throw new HttpsError(
+      "internal",
+      `Battle could not start: ${err?.message || "unknown error"}`
+    );
+  }
 });
 
 exports.battleAction = onCall({maxInstances: 3}, async (request) => {
