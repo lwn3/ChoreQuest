@@ -2868,6 +2868,7 @@ async function loadModLab(user) {
   try {
     let kid = await ensureModProfile();
     kid = await ensureInventoryInitialized(kid);
+    kid = await ensureClassProgressionInitialized(kid);
     if (!Array.isArray(kid.activeCompanions) || kid.activeCompanions.length === 0) {
       const activeCompanions = [
         {name: "Emberfox", icon: "🦊", effectId: "double_cast", abilityName: "Double Cast", abilityText: "Sometimes echoes a magic ability at reduced power."},
@@ -2912,8 +2913,11 @@ async function loadModLab(user) {
                 ${Object.entries(CLASS_DEFINITIONS).map(([id, def]) => `<option value="${id}" ${kid.classId === id ? "selected" : ""}>${escapeHtml(def.name)}</option>`).join("")}
               </select>
             </label>
-            <label>Level
+            <label>Character Level
               <input id="modLevelInput" type="number" min="1" max="100" value="${Math.max(1, Number(kid.level || 1))}">
+            </label>
+            <label>Class Level
+              <input id="modClassLevelInput" type="number" min="1" max="9" value="${classLevelFor(kid, kid.classId || "noob")}">
             </label>
             <label>Energy
               <input id="modEnergyInput" type="number" min="0" max="${MAX_ENERGY}" value="${Math.min(MAX_ENERGY, Number(kid.energy ?? MAX_ENERGY))}">
@@ -2952,6 +2956,7 @@ async function loadModLab(user) {
             <button id="modRefillBtn" type="button">⚡ Refill Energy</button>
             <button id="modWakeBtn" type="button">😴 Reset Sleepiness</button>
             <button id="modFoodsBtn" type="button">🍬 Add Test Food</button>
+            <button id="modUnlockClassesBtn" type="button">📚 Master All Classes</button>
             <button id="modAdventureBtn" type="button">🗺️ Open Adventure</button>
             <button id="modCharacterBtn" type="button">🧙 Open Character Sheet</button>
           </div>
@@ -2966,12 +2971,17 @@ async function loadModLab(user) {
       const classId = document.getElementById("modClassSelect").value;
       const def = CLASS_DEFINITIONS[classId];
       const level = Math.max(1, Math.min(100, Number(document.getElementById("modLevelInput").value || 1)));
+      const classLevel = Math.max(1, Math.min(def.maxLevel, Number(document.getElementById("modClassLevelInput").value || 1)));
+      const classLevels = {...(kid.classLevels || {}), [classId]: classLevel};
+      const classXp = {...(kid.classXp || {}), [classId]: classXpNeededForLevel(classLevel)};
+      const masteredClasses = CLASS_IDS.filter(id => Number(classLevels[id] || 0) >= CLASS_DEFINITIONS[id].maxLevel);
       await updateDoc(doc(db, "kids", MOD_PROFILE_ID), {
         classId,
         classTitle: def.name,
         classPath: def.name,
-        classBranch1: "",
-        classBranch2: "",
+        classLevels,
+        classXp,
+        masteredClasses,
         level,
         xp: (level - 1) * 100,
         energy: Math.max(0, Math.min(MAX_ENERGY, Number(document.getElementById("modEnergyInput").value || 0))),
@@ -3019,6 +3029,18 @@ async function loadModLab(user) {
       });
       await loadModLab(user);
     });
+    document.getElementById("modUnlockClassesBtn").addEventListener("click", async () => {
+      const classLevels = Object.fromEntries(CLASS_IDS.map(id => [id, CLASS_DEFINITIONS[id].maxLevel]));
+      const classXp = Object.fromEntries(CLASS_IDS.map(id => [id, classXpNeededForLevel(CLASS_DEFINITIONS[id].maxLevel)]));
+      await updateDoc(doc(db, "kids", MOD_PROFILE_ID), {
+        classLevels,
+        classXp,
+        masteredClasses: [...CLASS_IDS],
+        level: Math.max(20, Number(kid.level || 1))
+      });
+      await loadModLab(user);
+    });
+
     document.getElementById("modAdventureBtn").addEventListener("click", () => loadAdventureScreen(MOD_PROFILE_ID));
     document.getElementById("modCharacterBtn").addEventListener("click", () => loadClassScreen(MOD_PROFILE_ID));
     document.getElementById("modBackBtn").addEventListener("click", () => {
