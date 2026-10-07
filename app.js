@@ -2276,6 +2276,73 @@ function classCombatProgression(classId) {
   return CLASS_COMBAT_PROGRESSION[classId] || CLASS_COMBAT_PROGRESSION.warrior;
 }
 
+const CLASS_BRANCH_PERKS = {
+  knight: {name: "Knight Training", text: "+8% maximum HP.", maxHpMultiplier: 1.08},
+  berserker: {name: "Berserker Fury", text: "+10% physical damage.", physicalDamageBonus: 0.10},
+  paladin: {name: "Paladin Grace", text: "Healing is 15% stronger.", healBonus: 0.15},
+  "dragon-knight": {name: "Dragon Blood", text: "+5% critical chance.", critBonus: 0.05},
+  champion: {name: "Champion's Force", text: "+12% physical damage.", physicalDamageBonus: 0.12},
+  warlord: {name: "Warlord's Presence", text: "+12% Gold from battles.", goldMultiplier: 1.12},
+
+  scout: {name: "Scout Reflexes", text: "+5% dodge chance.", dodgeBonus: 0.05},
+  trickster: {name: "Trickster's Luck", text: "+6% critical chance.", critBonus: 0.06},
+  pathfinder: {name: "Pathfinder's Eye", text: "Better equipment drop chance.", lootBonus: 0.10},
+  "shadow-runner": {name: "Shadow Runner", text: "+10% physical damage.", physicalDamageBonus: 0.10},
+  "illusion-rogue": {name: "Illusion Feint", text: "+7% dodge chance.", dodgeBonus: 0.07},
+  "fortune-master": {name: "Fortune Master", text: "Better rarity rolls and +10% Gold.", lootBonus: 0.12, goldMultiplier: 1.10},
+
+  elementalist: {name: "Elemental Force", text: "+10% magic damage.", magicDamageBonus: 0.10},
+  enchanter: {name: "Deep Mana", text: "+2 maximum SP.", maxSpBonus: 2},
+  "fire-mage": {name: "Burning Power", text: "+15% magic damage.", magicDamageBonus: 0.15},
+  "frost-mage": {name: "Cold Focus", text: "+5% dodge and +1 maximum SP.", dodgeBonus: 0.05, maxSpBonus: 1},
+  illusionist: {name: "Mirage", text: "+8% dodge chance.", dodgeBonus: 0.08},
+  "rune-master": {name: "Rune Mastery", text: "+3 maximum SP.", maxSpBonus: 3},
+
+  "beast-friend": {name: "Beast Bond", text: "Companion abilities trigger more often.", companionProcBonus: 0.08},
+  "forest-warden": {name: "Forest Warden", text: "+8% maximum HP and stronger healing.", maxHpMultiplier: 1.08, healBonus: 0.08},
+  "storm-ranger": {name: "Storm Aim", text: "+8% critical chance.", critBonus: 0.08},
+  "beast-master": {name: "Beast Mastery", text: "Companion abilities trigger much more often.", companionProcBonus: 0.14},
+  "spirit-ranger": {name: "Spirit Bond", text: "+2 maximum SP and stronger healing.", maxSpBonus: 2, healBonus: 0.10},
+
+  protector: {name: "Protector Training", text: "+10% maximum HP.", maxHpMultiplier: 1.10},
+  healer: {name: "Healing Hands", text: "Healing is 18% stronger.", healBonus: 0.18},
+  sentinel: {name: "Sentinel Wall", text: "+12% maximum HP.", maxHpMultiplier: 1.12},
+  "royal-guard": {name: "Royal Guard", text: "+5% dodge and stronger guarding.", dodgeBonus: 0.05},
+  "light-keeper": {name: "Light Keeper", text: "+2 maximum SP and stronger healing.", maxSpBonus: 2, healBonus: 0.12},
+  "heart-mender": {name: "Heart Mender", text: "Healing is 25% stronger.", healBonus: 0.25},
+
+  "unicorn-princess": {name: "Unicorn Grace", text: "Healing is 12% stronger.", healBonus: 0.12},
+  "dragon-prince": {name: "Dragon Spirit", text: "+10% magic damage.", magicDamageBonus: 0.10},
+  "rainbow-queen": {name: "Rainbow Fortune", text: "Better rarity rolls.", lootBonus: 0.12},
+  "starlight-guardian": {name: "Starlight Ward", text: "+8% maximum HP and +5% dodge.", maxHpMultiplier: 1.08, dodgeBonus: 0.05},
+  "flame-king": {name: "Flame Crown", text: "+15% magic damage.", magicDamageBonus: 0.15},
+  "dragon-rider": {name: "Dragon Rider", text: "+8% critical chance and +8% Gold.", critBonus: 0.08, goldMultiplier: 1.08}
+};
+
+function combinedCombatPerks(kid) {
+  const base = {...classCombatProgression(kid.classId).passive};
+  [kid.classBranch1, kid.classBranch2].filter(Boolean).forEach(branchId => {
+    const perk = CLASS_BRANCH_PERKS[branchId];
+    if (!perk) return;
+    ["critBonus", "dodgeBonus", "lootBonus", "healBonus", "physicalDamageBonus", "magicDamageBonus", "maxSpBonus", "companionProcBonus"].forEach(key => {
+      if (perk[key]) base[key] = Number(base[key] || 0) + Number(perk[key]);
+    });
+    if (perk.maxHpMultiplier) base.maxHpMultiplier = Number(base.maxHpMultiplier || 1) * Number(perk.maxHpMultiplier);
+    if (perk.goldMultiplier) base.goldMultiplier = Number(base.goldMultiplier || 1) * Number(perk.goldMultiplier);
+  });
+  return base;
+}
+
+function classPerkCards(kid) {
+  const progression = classCombatProgression(kid.classId);
+  const perks = [{...progression.passive, source: "Class perk"}];
+  [kid.classBranch1, kid.classBranch2].filter(Boolean).forEach(branchId => {
+    const perk = CLASS_BRANCH_PERKS[branchId];
+    if (perk) perks.push({...perk, source: "Path perk"});
+  });
+  return perks;
+}
+
 function unlockedCombatSkills(kid) {
   const level = Math.max(1, Number(kid.level || 1));
   return classCombatProgression(kid.classId).skills.filter(skill => level >= skill.level);
@@ -2372,7 +2439,7 @@ async function startLocalBattle(kidId, adventureId) {
   const stats = getClassStats(kid);
   const level = Math.max(1, Number(kid.level || 1));
   const progression = classCombatProgression(kid.classId);
-  const passive = progression.passive || {};
+  const passive = combinedCombatPerks(kid);
   const skills = unlockedCombatSkills(kid);
   const companions = companionBattleEffects(kid);
   const baseHp = 30 + level * 3 + Math.round(Number(stats.courage || 0) * 3.5);
@@ -2473,6 +2540,7 @@ async function resolveLocalBattleAction(kidId, battle, action, skillId = "") {
     if (Number(skill.healPct || 0) > 0) {
       let healPct = Number(skill.healPct || 0);
       if (skill.kindnessHeal) healPct += Math.min(0.18, Number(stats.kindness || 0) * 0.004);
+      healPct += Number(battle.passive?.healBonus || 0);
       const heal = Math.max(1, Math.round(Number(player.maxHp || 0) * healPct));
       player.hp = Math.min(Number(player.maxHp || 0), Number(player.hp || 0) + heal);
       log.push(`${player.name} uses ${skill.name} and recovers ${heal} HP.`);
@@ -2506,8 +2574,11 @@ async function resolveLocalBattleAction(kidId, battle, action, skillId = "") {
       }
       const defense = rawDefense * (1 - Math.min(0.9, armorPierce));
       const weaknessMultiplier = enemy.weakness === kind ? 1.25 : 1;
+      const damageBonus = kind === "magic"
+        ? Number(battle.passive?.magicDamageBonus || 0)
+        : Number(battle.passive?.physicalDamageBonus || 0);
       const variance = 0.9 + Math.random() * 0.2;
-      let damage = Math.max(1, Math.round(((statValue * multiplier + Number(stats.agility || 0) * 0.15) * variance - defense) * weaknessMultiplier));
+      let damage = Math.max(1, Math.round(((statValue * multiplier + Number(stats.agility || 0) * 0.15) * variance - defense) * weaknessMultiplier * (1 + damageBonus)));
       const passiveCrit = Number(battle.passive?.critBonus || 0);
       const critChance = Math.min(0.45, 0.04 + Number(stats.luck || 0) * 0.006 + passiveCrit + Number(skill.critBonus || 0));
       const crit = Math.random() < critChance;
@@ -2520,7 +2591,7 @@ async function resolveLocalBattleAction(kidId, battle, action, skillId = "") {
         log.push(`${player.name} uses ${isSkill ? skill.name : player.basicName} for ${damage} damage${crit ? " — critical hit!" : ""}${weaknessMultiplier > 1 ? " — weakness!" : "!"}`);
 
         const doubleCaster = companions.find(companion => companion.effect === "double_cast");
-        const doubleChance = Math.min(0.30, 0.12 + Number(stats.kindness || 0) * 0.004);
+        const doubleChance = Math.min(0.45, 0.12 + Number(stats.kindness || 0) * 0.004 + Number(battle.passive?.companionProcBonus || 0));
         if (doubleCaster && isSkill && kind === "magic" && Math.random() < doubleChance && Number(enemy.hp || 0) > 0) {
           const echoDamage = Math.max(1, Math.round(damage * 0.65));
           enemy.hp = Math.max(0, Number(enemy.hp || 0) - echoDamage);
@@ -2545,7 +2616,11 @@ async function resolveLocalBattleAction(kidId, battle, action, skillId = "") {
     const gold = Math.max(1, Math.round(adventure.gold * rewardRoll * goldMultiplier));
     const newXp = Number(kid.xp || 0) + xp;
     const level = Math.floor(newXp / 100) + 1;
-    const drop = rollBattleDrop(kid, battle.adventureId, companions);
+    const dropCompanions = [...companions];
+    if (Number(battle.passive?.lootBonus || 0) > 0) {
+      dropCompanions.push({effect: "treasure_nose"});
+    }
+    const drop = rollBattleDrop(kid, battle.adventureId, dropCompanions);
     const inventory = Array.isArray(kid.inventory) ? [...kid.inventory] : [];
     if (drop) inventory.push(drop);
 
