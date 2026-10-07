@@ -70,6 +70,11 @@ async function userCanAccessKid(kidId) {
 }
 
 
+function setAppTheme(mode = "default") {
+  document.body.classList.toggle("kid-theme", mode === "kid");
+  document.body.classList.toggle("parent-theme", mode === "parent");
+}
+
 /* -------------------------------------------------
    CLASS SYSTEM FOUNDATION
 ------------------------------------------------- */
@@ -760,6 +765,7 @@ async function loadUserDashboard(user = auth.currentUser) {
 }
 
 async function loadChildSelector() {
+  setAppTheme("kid");
   document.body.innerHTML = `<main class="app"><section class="card"><p>Loading profiles...</p></section></main>`;
   try {
     const kids = await getPublicKids();
@@ -821,6 +827,7 @@ async function hashPin(pin) {
 }
 
 async function loadKidEntry(kidId) {
+  setAppTheme("kid");
   try {
     const user = auth.currentUser || await waitForAuthUser();
 
@@ -1206,6 +1213,7 @@ async function getTodayHistory() {
 }
 
 async function loadKidDashboard(kidId) {
+  setAppTheme("kid");
   if (!await userCanAccessKid(kidId)) {
     await loadKidEntry(kidId);
     return;
@@ -1258,6 +1266,7 @@ async function loadKidDashboard(kidId) {
 }
 
 function renderDashboard(kid, mainQuests, sideQuests, allKids) {
+  setAppTheme("kid");
   const xp = Number(kid.xp || 0);
   const gold = Number(kid.gold || 0);
   const streak = Number(kid.currentStreak || 0);
@@ -1347,6 +1356,7 @@ function renderDashboard(kid, mainQuests, sideQuests, allKids) {
 
 
 async function loadClassScreen(kidId) {
+  setAppTheme("kid");
   try {
     const kidSnap = await getDoc(doc(db, "kids", kidId));
     if (!kidSnap.exists()) { showError("Child profile not found."); return; }
@@ -1876,6 +1886,7 @@ function questCard(quest, currentKidId) {
 }
 
 async function openQuestSubmission(choreId, currentKidId, allKids) {
+  setAppTheme("kid");
   try {
     const questSnap = await getDoc(doc(db, "quests", choreId));
     if (!questSnap.exists()) { alert("Quest not found."); return; }
@@ -2009,6 +2020,7 @@ async function resetDailyQuestsIfNeeded() {
 ------------------------------------------------- */
 
 async function loadAdventureScreen(kidId) {
+  setAppTheme("kid");
   try {
     const kidSnap = await getDoc(doc(db, "kids", kidId));
     if (!kidSnap.exists()) { showError("Adventurer not found."); return; }
@@ -2071,6 +2083,7 @@ async function loadAdventureScreen(kidId) {
 }
 
 async function renderBattleScreen(kidId, battle) {
+  setAppTheme("kid");
   try {
     const kidSnap = await getDoc(doc(db, "kids", kidId));
     const kid = kidSnap.exists() ? { kidId, ...kidSnap.data() } : { kidId, name: battle?.player?.name || kidId, avatar: "⚔️" };
@@ -2213,6 +2226,7 @@ async function ensureModProfile() {
 }
 
 async function loadModLab(user) {
+  setAppTheme("parent");
   if (String(user?.email || "").toLowerCase() !== ADMIN_EMAIL) {
     await loadParentDashboard(user);
     return;
@@ -2394,6 +2408,7 @@ async function loadParentDashboard(user) {
 }
 
 function renderParentDashboard(data, user) {
+  setAppTheme("parent");
   const isGuildMaster = String(user?.email || "").toLowerCase() === ADMIN_EMAIL;
   const pending = data.submissions.filter(s => s.status === "Pending");
   document.body.innerHTML = `
@@ -2629,6 +2644,7 @@ function formatDateTime(value) {
 ------------------------------------------------- */
 
 async function loadFamilyAccounts(user) {
+  setAppTheme("parent");
   if (!isParentUser(user)) { await loadUserDashboard(null); return; }
   try {
     const kidsSnap = await getDocs(collection(db, "kids"));
@@ -2805,6 +2821,7 @@ function loadNewKidForm(user, kids) {
 ------------------------------------------------- */
 
 async function loadQuestManager(user) {
+  setAppTheme("parent");
   const email = String(user?.email || "").toLowerCase();
 
   if (email !== ADMIN_EMAIL) {
