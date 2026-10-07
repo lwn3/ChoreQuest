@@ -3241,17 +3241,20 @@ async function deleteQuest(questId, questName) {
 }
 
 async function loadEditQuestForm(questId) {
+  setAppTheme("parent");
   try {
-    const questSnap = await getDoc(doc(db, "quests", questId));
-    const kidsSnap = await getDocs(collection(db, "kids"));
+    const [questSnap, kidsSnap, allQuestSnap] = await Promise.all([
+      getDoc(doc(db, "quests", questId)),
+      getDocs(collection(db, "kids")),
+      getDocs(collection(db, "quests"))
+    ]);
 
     if (!questSnap.exists()) {
       showError("Quest not found.");
       return;
     }
 
-    const quest = questSnap.data();
-
+    const quest = { questId, ...questSnap.data() };
     if (quest.archived === true) {
       alert("Restore this quest before editing it.");
       await loadQuestManager(auth.currentUser);
@@ -3259,334 +3262,186 @@ async function loadEditQuestForm(questId) {
     }
 
     const kids = [];
-
-    kidsSnap.forEach(docSnap => {
-      kids.push({
-        kidId: docSnap.id,
-        ...docSnap.data()
-      });
-    });
+    kidsSnap.forEach(docSnap => kids.push({ kidId: docSnap.id, ...docSnap.data() }));
+    const allQuests = [];
+    allQuestSnap.forEach(docSnap => allQuests.push({ questId: docSnap.id, ...docSnap.data() }));
 
     document.body.innerHTML = `
-      <main class="app">
+      <main class="app task-editor-app">
         ${renderSignOutHeader(auth.currentUser)}
-
-        <header class="hero compact">
-          <div class="logo">✏️</div>
-          <h1>Edit Quest</h1>
-          <p>${escapeHtml(quest.name || "")}</p>
+        <header class="hero compact task-editor-hero">
+          <div class="logo">✓</div>
+          <h1>Edit task</h1>
+          <p>Set assignment, recurrence, subtasks, and reward.</p>
         </header>
 
-        <section
-          class="card form-card"
-          style="display:flex; flex-direction:column; gap:12px;"
-        >
-          ${formField(
-            "Quest Name",
-            `<input
-              id="questName"
-              value="${escapeAttribute(quest.name || "")}"
-              style="width:100%; box-sizing:border-box; padding:10px;"
-            >`
-          )}
+        <section class="card form-card task-editor-card">
+          ${formField("Task name", `<input id="questName" value="${escapeAttribute(quest.name || "")}" placeholder="Task name">`)}
 
-          ${formField(
-            "Assigned Adventurer",
-            `
-              <select
-                id="questKid"
-                style="width:100%; box-sizing:border-box; padding:10px;"
-              >
-                <option value="ANYONE" ${quest.kidId === ANYONE_ID ? "selected" : ""}>Anyone / Random Household Quest</option>
-                ${kids
-                  .map(
-                    kid => `
-                      <option
-                        value="${escapeAttribute(kid.kidId)}"
-                        ${quest.kidId === kid.kidId ? "selected" : ""}
-                      >
-                        ${escapeHtml(kid.name || kid.kidId)}
-                      </option>
-                    `
-                  )
-                  .join("")}
-              </select>
-            `
-          )}
+          ${formField("Assigned to", `
+            <select id="questKid">
+              <option value="ANYONE" ${quest.kidId === ANYONE_ID ? "selected" : ""}>Anyone</option>
+              ${kids.map(kid => `<option value="${escapeAttribute(kid.kidId)}" ${quest.kidId === kid.kidId ? "selected" : ""}>${escapeHtml(kid.name || kid.kidId)}</option>`).join("")}
+            </select>
+          `)}
 
-          ${formField(
-            "Schedule",
-            `
-              <select id="questScheduleType" style="width:100%; box-sizing:border-box; padding:10px;">
-                <option value="daily" ${getQuestScheduleType(quest) === "daily" ? "selected" : ""}>Daily</option>
-                <option value="weekdays" ${getQuestScheduleType(quest) === "weekdays" ? "selected" : ""}>Selected Weekdays</option>
-                <option value="weekly" ${getQuestScheduleType(quest) === "weekly" ? "selected" : ""}>Weekly</option>
-                <option value="one-time" ${getQuestScheduleType(quest) === "one-time" ? "selected" : ""}>One-Time</option>
-              </select>
-            `
-          )}
+          ${renderQuestScheduleEditor(quest, allQuests, questId)}
 
-          <div id="weekdayOptions" style="display:none;flex-wrap:wrap;gap:6px;">${weekdayCheckboxes(quest.weekdays || [])}</div>
-
-          ${formField(
-            "Due Time (optional)",
-            `<input id="questDueTime" type="time" value="${escapeAttribute(quest.dueTime || "")}" style="width:100%; box-sizing:border-box; padding:10px;">`
-          )}
-
-          ${formField(
-            "Timeframe Note",
-            `<input id="questTime" value="${escapeAttribute(quest.time || "Anytime")}" placeholder="Before bed, after school..." style="width:100%; box-sizing:border-box; padding:10px;">`
-          )}
-
-          ${formField(
-            "Adventure Food Reward",
-            `<select id="questFoodTier" style="width:100%; box-sizing:border-box; padding:10px;">
+          ${formField("Adventure food reward", `
+            <select id="questFoodTier">
               <option value="small" ${questFoodTier(quest) === "small" ? "selected" : ""}>Small snack</option>
               <option value="medium" ${questFoodTier(quest) === "medium" ? "selected" : ""}>Medium snack</option>
               <option value="large" ${questFoodTier(quest) === "large" ? "selected" : ""}>Large snack</option>
-            </select>`
-          )}
+            </select>
+          `)}
 
-          <label style="display:flex; align-items:center; gap:8px;">
-            <input id="questAllowHelpers" type="checkbox" ${quest.allowHelpers !== false ? "checked" : ""}>
-            Allow other children and group helpers
-          </label>
+          <label class="task-toggle"><input id="questAllowHelpers" type="checkbox" ${quest.allowHelpers !== false ? "checked" : ""}><span>Allow helpers</span></label>
+          <label class="task-toggle"><input id="questActive" type="checkbox" ${quest.active !== false ? "checked" : ""}><span>Active</span></label>
 
-          <label
-            style="display:flex; align-items:center; gap:8px;"
-          >
-            <input
-              id="questActive"
-              type="checkbox"
-              ${quest.active !== false ? "checked" : ""}
-            >
-            Active
-          </label>
-
-          <button id="saveQuestBtn" type="button">
-            Save Blueprint
-          </button>
+          <button id="saveQuestBtn" type="button" class="task-primary-btn">Save task</button>
         </section>
 
-        <button id="cancelEditBtn" type="button">
-          ← Cancel
-        </button>
-      </main>
-    `;
+        <button id="cancelEditBtn" type="button">← Cancel</button>
+      </main>`;
 
     attachSignOutEvent();
     attachScheduleFormBehavior();
 
-    document
-      .getElementById("saveQuestBtn")
-      .addEventListener("click", async () => {
-        const name = document
-          .getElementById("questName")
-          .value.trim();
+    document.getElementById("saveQuestBtn").addEventListener("click", async () => {
+      const name = document.getElementById("questName").value.trim();
+      if (!name) {
+        alert("Please enter a task name.");
+        return;
+      }
 
-        if (!name) {
-          alert("Please enter a quest name.");
-          return;
-        }
+      const schedule = readQuestScheduleForm();
+      if (schedule.scheduleType === "weekdays" && schedule.weekdays.length === 0) {
+        alert("Choose at least one weekday.");
+        return;
+      }
 
-        try {
-          await updateDoc(doc(db, "quests", questId), {
-            name,
-            kidId: document.getElementById("questKid").value,
-            type: document.getElementById("questScheduleType").value,
-            scheduleType: document.getElementById("questScheduleType").value,
-            weekdays: getSelectedWeekdays(),
-            dueTime: document.getElementById("questDueTime").value,
-            time:
-              document.getElementById("questTime").value.trim() ||
-              "Anytime",
-            foodTier: document.getElementById("questFoodTier").value,
-            active: document.getElementById("questActive").checked,
-            allowHelpers: document.getElementById("questAllowHelpers").checked,
-            updatedAt: new Date().toISOString()
-          });
+      if (schedule.parentQuestId === questId) {
+        alert("A task cannot be its own parent.");
+        return;
+      }
 
-          await loadQuestManager(auth.currentUser);
-        } catch (err) {
-          showError("Could not save quest: " + err.message);
-        }
-      });
+      try {
+        await updateDoc(doc(db, "quests", questId), {
+          name,
+          kidId: document.getElementById("questKid").value,
+          ...schedule,
+          foodTier: document.getElementById("questFoodTier").value,
+          active: document.getElementById("questActive").checked,
+          allowHelpers: document.getElementById("questAllowHelpers").checked,
+          updatedAt: new Date().toISOString()
+        });
+        await loadQuestManager(auth.currentUser);
+      } catch (err) {
+        showError("Could not save task: " + err.message);
+      }
+    });
 
-    document
-      .getElementById("cancelEditBtn")
-      .addEventListener("click", () => {
-        loadQuestManager(auth.currentUser);
-      });
+    document.getElementById("cancelEditBtn").addEventListener("click", () => loadQuestManager(auth.currentUser));
   } catch (err) {
-    showError("Edit quest error: " + err.message);
+    showError("Edit task error: " + err.message);
   }
 }
 
 async function loadNewQuestForm() {
+  setAppTheme("parent");
   try {
-    const kidsSnap = await getDocs(collection(db, "kids"));
-    const kids = [];
+    const [kidsSnap, allQuestSnap] = await Promise.all([
+      getDocs(collection(db, "kids")),
+      getDocs(collection(db, "quests"))
+    ]);
 
-    kidsSnap.forEach(docSnap => {
-      kids.push({
-        kidId: docSnap.id,
-        ...docSnap.data()
-      });
-    });
+    const kids = [];
+    kidsSnap.forEach(docSnap => kids.push({ kidId: docSnap.id, ...docSnap.data() }));
+    const allQuests = [];
+    allQuestSnap.forEach(docSnap => allQuests.push({ questId: docSnap.id, ...docSnap.data() }));
+    const today = getTodayKey();
 
     document.body.innerHTML = `
-      <main class="app">
+      <main class="app task-editor-app">
         ${renderSignOutHeader(auth.currentUser)}
-
-        <header class="hero compact">
-          <div class="logo">➕</div>
-          <h1>New Quest</h1>
-          <p>Create a new chore quest.</p>
+        <header class="hero compact task-editor-hero">
+          <div class="logo">＋</div>
+          <h1>New task</h1>
+          <p>Create a one-time or repeating household task.</p>
         </header>
 
-        <section
-          class="card form-card"
-          style="display:flex; flex-direction:column; gap:12px;"
-        >
-          ${formField(
-            "Quest Name",
-            `<input
-              id="questName"
-              placeholder="Defeat the Laundry Dragon..."
-              style="width:100%; box-sizing:border-box; padding:10px;"
-            >`
-          )}
+        <section class="card form-card task-editor-card">
+          ${formField("Task name", `<input id="questName" placeholder="e.g. Check cat litter">`)}
 
-          ${formField(
-            "Assign To",
-            `
-              <select
-                id="questKid"
-                style="width:100%; box-sizing:border-box; padding:10px;"
-              >
-                <option value="ANYONE">Anyone / Random Household Quest</option>
-                ${kids
-                  .map(
-                    kid => `
-                      <option value="${escapeAttribute(kid.kidId)}">
-                        ${escapeHtml(kid.name || kid.kidId)}
-                      </option>
-                    `
-                  )
-                  .join("")}
-              </select>
-            `
-          )}
+          ${formField("Assigned to", `
+            <select id="questKid">
+              <option value="ANYONE">Anyone</option>
+              ${kids.map(kid => `<option value="${escapeAttribute(kid.kidId)}">${escapeHtml(kid.name || kid.kidId)}</option>`).join("")}
+            </select>
+          `)}
 
-          ${formField(
-            "Schedule",
-            `
-              <select id="questScheduleType" style="width:100%; box-sizing:border-box; padding:10px;">
-                <option value="daily">Daily</option>
-                <option value="weekdays">Selected Weekdays</option>
-                <option value="weekly">Weekly</option>
-                <option value="one-time">One-Time</option>
-              </select>
-            `
-          )}
+          ${renderQuestScheduleEditor({ scheduleType: "interval", intervalDays: 1, startDate: today, dueDate: today }, allQuests)}
 
-          <div id="weekdayOptions" style="display:none;flex-wrap:wrap;gap:6px;">${weekdayCheckboxes([])}</div>
-
-          ${formField(
-            "Due Time (optional)",
-            `<input id="questDueTime" type="time" style="width:100%; box-sizing:border-box; padding:10px;">`
-          )}
-
-          ${formField(
-            "Timeframe Note",
-            `<input id="questTime" value="Anytime" placeholder="Before bed, after school..." style="width:100%; box-sizing:border-box; padding:10px;">`
-          )}
-
-          ${formField(
-            "Adventure Food Reward",
-            `<select id="questFoodTier" style="width:100%; box-sizing:border-box; padding:10px;">
+          ${formField("Adventure food reward", `
+            <select id="questFoodTier">
               <option value="small">Small snack</option>
               <option value="medium" selected>Medium snack</option>
               <option value="large">Large snack</option>
-            </select>`
-          )}
+            </select>
+          `)}
 
-          <label style="display:flex; align-items:center; gap:8px;">
-            <input id="questAllowHelpers" type="checkbox" checked>
-            Allow other children and group helpers
-          </label>
+          <label class="task-toggle"><input id="questAllowHelpers" type="checkbox" checked><span>Allow helpers</span></label>
+          <label class="task-toggle"><input id="questActive" type="checkbox" checked><span>Active</span></label>
 
-          <label
-            style="display:flex; align-items:center; gap:8px;"
-          >
-            <input id="questActive" type="checkbox" checked>
-            Active
-          </label>
-
-          <button id="createQuestBtn" type="button">
-            Create Quest Blueprint
-          </button>
+          <button id="createQuestBtn" type="button" class="task-primary-btn">Create task</button>
         </section>
 
-        <button id="cancelNewQuestBtn" type="button">
-          ← Cancel
-        </button>
-      </main>
-    `;
+        <button id="cancelNewQuestBtn" type="button">← Cancel</button>
+      </main>`;
 
     attachSignOutEvent();
     attachScheduleFormBehavior();
 
-    document
-      .getElementById("createQuestBtn")
-      .addEventListener("click", async () => {
-        const name = document
-          .getElementById("questName")
-          .value.trim();
+    document.getElementById("createQuestBtn").addEventListener("click", async () => {
+      const name = document.getElementById("questName").value.trim();
+      if (!name) {
+        alert("Please enter a task name.");
+        return;
+      }
 
-        if (!name) {
-          alert("Please enter a quest name.");
-          return;
-        }
+      const schedule = readQuestScheduleForm();
+      if (schedule.scheduleType === "weekdays" && schedule.weekdays.length === 0) {
+        alert("Choose at least one weekday.");
+        return;
+      }
 
-        try {
-          await addDoc(collection(db, "quests"), {
-            name,
-            kidId: document.getElementById("questKid").value,
-            type: document.getElementById("questScheduleType").value,
-            scheduleType: document.getElementById("questScheduleType").value,
-            weekdays: getSelectedWeekdays(),
-            dueTime: document.getElementById("questDueTime").value,
-            time:
-              document.getElementById("questTime").value.trim() ||
-              "Anytime",
-            foodTier: document.getElementById("questFoodTier").value,
-            xp: 0,
-            gold: 0,
-            helperBonus: 0,
-            active: document.getElementById("questActive").checked,
-            allowHelpers: document.getElementById("questAllowHelpers").checked,
-            archived: false,
-            status: "Ready",
-            completedBy: "",
-            lastResetDate: getTodayKey(),
-            lastResetPeriod: getQuestPeriodKey({ scheduleType: document.getElementById("questScheduleType").value }),
-            createdAt: new Date().toISOString()
-          });
+      try {
+        await addDoc(collection(db, "quests"), {
+          name,
+          kidId: document.getElementById("questKid").value,
+          ...schedule,
+          foodTier: document.getElementById("questFoodTier").value,
+          xp: 0,
+          gold: 0,
+          helperBonus: 0,
+          active: document.getElementById("questActive").checked,
+          allowHelpers: document.getElementById("questAllowHelpers").checked,
+          archived: false,
+          status: "Ready",
+          completedBy: "",
+          lastResetDate: getTodayKey(),
+          lastResetPeriod: "",
+          createdAt: new Date().toISOString()
+        });
+        await loadQuestManager(auth.currentUser);
+      } catch (err) {
+        showError("Error creating task: " + err.message);
+      }
+    });
 
-          await loadQuestManager(auth.currentUser);
-        } catch (err) {
-          showError("Error creating quest: " + err.message);
-        }
-      });
-
-    document
-      .getElementById("cancelNewQuestBtn")
-      .addEventListener("click", () => {
-        loadQuestManager(auth.currentUser);
-      });
+    document.getElementById("cancelNewQuestBtn").addEventListener("click", () => loadQuestManager(auth.currentUser));
   } catch (err) {
-    showError("Could not open new quest form: " + err.message);
+    showError("Could not open new task form: " + err.message);
   }
 }
 
