@@ -1339,6 +1339,22 @@ function equipmentComparisonHtml(candidate, current) {
     </span>`).join("");
 }
 
+function renderEquippedLoadout(equipment) {
+  return Object.entries(EQUIPMENT_SLOTS).map(([slot, label]) => {
+    const item = equipment?.[slot] || null;
+    const grade = item ? (ITEM_GRADES[item.grade] || ITEM_GRADES.wood) : null;
+    return `
+      <button class="loadout-slot ${item ? "filled" : "empty"}" type="button" data-loadout-slot="${slot}" aria-label="${escapeAttribute(label)}">
+        <span class="loadout-slot-label">${escapeHtml(label)}</span>
+        <span class="loadout-slot-icon" ${grade ? `style="border-color:${grade.color};box-shadow:0 0 16px ${grade.glow};"` : ""}>
+          ${item ? itemIcon(item) : (EQUIPMENT_SLOT_ICONS[slot] || "＋")}
+        </span>
+        <strong>${escapeHtml(item ? displayItemName(item) : "Empty")}</strong>
+        <small>${item ? escapeHtml(formatBonuses(item)) : "Tap to equip"}</small>
+      </button>`;
+  }).join("");
+}
+
 function renderClassScreen(kid) {
   const def = CLASS_DEFINITIONS[kid.classId];
   const level = Math.max(1, Number(kid.level || 1));
@@ -1395,6 +1411,17 @@ function renderClassScreen(kid) {
           <div><span>Inventory</span><strong>${inventory.length}</strong></div>
           <div><span>Rebirths</span><strong>${Number(kid.rebirths || 0)}</strong></div>
         </div>
+      </section>
+
+      <section class="card loadout-card">
+        <div class="jrpg-section-heading">
+          <div>
+            <h2>Current Loadout</h2>
+            <p>Your equipped Wood-tier gear at a glance.</p>
+          </div>
+          <span>${Object.keys(equipped).length}/${Object.keys(EQUIPMENT_SLOTS).length}</span>
+        </div>
+        <div class="loadout-grid">${renderEquippedLoadout(equipped)}</div>
       </section>
 
       <section class="card jrpg-menu-card">
@@ -1520,6 +1547,13 @@ function renderClassScreen(kid) {
 
   document.querySelectorAll(".equipment-slot-row").forEach(button => {
     button.addEventListener("click", () => openEquipmentChooser(button.dataset.equipmentSlot));
+  });
+
+  document.querySelectorAll(".loadout-slot").forEach(button => {
+    button.addEventListener("click", () => {
+      openEquipmentChooser(button.dataset.loadoutSlot);
+      document.getElementById("equipmentChooserHost")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   });
 
   document.getElementById("classScreenBackBtn").addEventListener("click", () => loadKidDashboard(kid.kidId));
