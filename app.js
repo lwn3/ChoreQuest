@@ -1414,81 +1414,109 @@ function renderDashboard(kid, mainQuests, sideQuests, allKids) {
 }
 
 
+async function ensureClassProgressionInitialized(kid) {
+  const classId = CLASS_DEFINITIONS[kid.classId] ? kid.classId : "noob";
+  const classLevels = kid.classLevels && typeof kid.classLevels === "object" ? {...kid.classLevels} : {};
+  const classXp = kid.classXp && typeof kid.classXp === "object" ? {...kid.classXp} : {};
+  let changed = false;
+
+  if (!Number(classLevels.noob || 0)) {
+    classLevels.noob = 1;
+    classXp.noob = Number(classXp.noob || 0);
+    changed = true;
+  }
+  if (!Number(classLevels[classId] || 0)) {
+    classLevels[classId] = 1;
+    classXp[classId] = Number(classXp[classId] || 0);
+    changed = true;
+  }
+
+  const supportClasses = Array.isArray(kid.supportClasses) ? kid.supportClasses.filter(id => CLASS_DEFINITIONS[id]) : [];
+  if (classId !== kid.classId || changed || !Array.isArray(kid.supportClasses)) {
+    await updateDoc(doc(db, "kids", kid.kidId), {
+      classId,
+      classTitle: CLASS_DEFINITIONS[classId].name,
+      classPath: CLASS_DEFINITIONS[classId].name,
+      classLevels,
+      classXp,
+      supportClasses
+    });
+  }
+
+  return {...kid, classId, classTitle: CLASS_DEFINITIONS[classId].name, classPath: CLASS_DEFINITIONS[classId].name, classLevels, classXp, supportClasses};
+}
+
 async function loadClassScreen(kidId) {
   setAppTheme("kid");
   try {
     const kidSnap = await getDoc(doc(db, "kids", kidId));
     if (!kidSnap.exists()) { showError("Child profile not found."); return; }
-    let kid = { kidId, ...kidSnap.data() };
+    let kid = {kidId, ...kidSnap.data()};
     kid = await ensureInventoryInitialized(kid);
-    if (!kid.classId || !CLASS_DEFINITIONS[kid.classId]) {
-      renderStartingClassSelection(kid);
-      return;
-    }
+    kid = await ensureClassProgressionInitialized(kid);
     renderClassScreen(kid);
   } catch (err) {
     showError("Could not load class screen: " + err.message);
   }
 }
 
-function renderStartingClassSelection(kid) {
-  document.body.innerHTML = `
-    <main class="app">
-      <header class="hero compact"><div class="logo">🌟</div><h1>Choose Your Class</h1><p>${escapeHtml(kid.name || "Adventurer")}, choose the path that sounds most like you.</p></header>
-      <section class="character-select">
-        ${Object.entries(CLASS_DEFINITIONS).map(([id, c]) => `
-          <button class="character-card-btn choose-class-btn" type="button" data-class-id="${id}">
-            <div class="avatar">${c.icon}</div><strong>${escapeHtml(c.name)}</strong><span>${escapeHtml(c.description)}</span>
-          </button>`).join("")}
-      </section>
-      <button id="classBackBtn" type="button" style="width:100%;margin-top:16px;">← Back</button>
-    </main>`;
-  document.querySelectorAll(".choose-class-btn").forEach(button => button.addEventListener("click", async () => {
-    const classId = button.dataset.classId;
-    const def = CLASS_DEFINITIONS[classId];
-    if (!confirm(`Choose ${def.name} as your starting class?`)) return;
-    await updateDoc(doc(db, "kids", kid.kidId), {
-      classId,
-      classTitle: def.name,
-      classPath: def.name,
-      classBranch1: "",
-      classBranch2: "",
-      classChosenAt: new Date().toISOString()
-    });
-    await loadClassScreen(kid.kidId);
-  }));
-  document.getElementById("classBackBtn").addEventListener("click", () => loadKidDashboard(kid.kidId));
+function renderClassSprite(classId, extraClass = "") {
+  const def = CLASS_DEFINITIONS[classId] || CLASS_DEFINITIONS.noob;
+  return `<svg class="class-sprite ${escapeAttribute(extraClass)}" viewBox="0 0 64 64" role="img" aria-label="${escapeAttribute(def.name)}"><use href="assets/class-sprites.svg#class-${escapeAttribute(def.spriteId)}"></use></svg>`;
 }
 
 function getBaseClassStats(kid) {
-  const def = CLASS_DEFINITIONS[kid.classId];
+  const def = CLASS_DEFINITIONS[kid.classId] || CLASS_DEFINITIONS.noob;
   const level = Math.max(1, Number(kid.level || 1));
+  const levelGrowth = Math.floor((level - 1) / 2);
   const stats = {};
   STAT_KEYS.forEach(key => {
-    stats[key] = Number(def.base[key] || 0) + Math.max(0, level - 1) * Number(def.growth[key] || 0);
+    stats[key] = 5 + levelGrowth + Number(def.statBias?.[key] || 0);
   });
-  stats.hp = 20 + level * 5;
+  stats.hp = 30 + level * 4 + Number(stats.courage || 0) * 2;
   return stats;
 }
 
 function getClassStats(kid) {
   const stats = getBaseClassStats(kid);
-  const gear = equipmentBonuses(kid.equipment || {});
+  const rawGear = equipmentBonuses(kid.equipment || {});
+  const passive = aggregatePassivePerks(kid);
+  const gearMultiplier = 1 + Number(passive.equipmentBonusPct || 0);
+  const gearFlat = Number(passive.equipmentFlatBonus || 0);
+
   STAT_KEYS.forEach(key => {
-    stats[key] += Number(gear[key] || 0);
+    const gearValue = Number(rawGear[key] || 0);
+    stats[key] += Math.round(gearValue * gearMultiplier) + (gearValue > 0 ? gearFlat : 0);
   });
   return stats;
 }
 
 function getCurrentClassTitle(kid) {
-  const def = CLASS_DEFINITIONS[kid.classId];
-  if (!def) return kid.classTitle || "Adventurer";
-  if (kid.classBranch2) {
-    const all = Object.values(def.branch2 || {}).flat();
-    return all.find(x => x.id === kid.classBranch2)?.name || kid.classTitle || def.name;
-  }
-  if (kid.classBranch1) return def.branch1.find(x => x.id === kid.classBranch1)?.name || def.name;
-  return def.name;
+  return CLASS_DEFINITIONS[kid.classId]?.name || kid.classTitle || "Noob";
+}
+
+function currentClassLevel(kid) {
+  return Math.max(1, classLevelFor(kid, kid.classId || "noob"));
+}
+
+function currentClassXpProgress(kid) {
+  const classId = kid.classId || "noob";
+  const def = CLASS_DEFINITIONS[classId] || CLASS_DEFINITIONS.noob;
+  const level = currentClassLevel(kid);
+  const xp = classXpFor(kid, classId);
+  const currentFloor = classXpNeededForLevel(level);
+  const nextFloor = level >= def.maxLevel ? currentFloor : classXpNeededForLevel(level + 1);
+  const earned = Math.max(0, xp - currentFloor);
+  const needed = Math.max(1, nextFloor - currentFloor);
+  return {
+    level,
+    xp,
+    maxLevel: def.maxLevel,
+    atCap: level >= def.maxLevel,
+    pct: level >= def.maxLevel ? 100 : Math.max(0, Math.min(100, Math.round(earned / needed * 100))),
+    earned,
+    needed
+  };
 }
 
 function radarChartSvg(stats, comparisonStats = null) {
