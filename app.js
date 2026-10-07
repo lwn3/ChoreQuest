@@ -71,7 +71,7 @@ async function userCanAccessKid(kidId) {
 
 
 function setAppTheme(mode = "default") {
-  document.body.classList.toggle("kid-theme", mode === "kid");
+  document.body.classList.add("kid-theme");
   document.body.classList.toggle("parent-theme", mode === "parent");
 }
 
