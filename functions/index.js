@@ -4,6 +4,7 @@
 const crypto = require("crypto");
 const {setGlobalOptions} = require("firebase-functions/v2");
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
+const functionsV1 = require("firebase-functions/v1");
 const {initializeApp} = require("firebase-admin/app");
 const {getAuth} = require("firebase-admin/auth");
 const {getFirestore, FieldValue} = require("firebase-admin/firestore");
@@ -656,3 +657,24 @@ const battleActionHandler = async (request) => {
 
 exports.battleAction = onCall({maxInstances: 3, invoker: "public"}, battleActionHandler);
 exports.battleActionV2 = onCall({maxInstances: 3, invoker: "public"}, battleActionHandler);
+
+
+exports.startBattleLegacy = functionsV1
+    .region("us-central1")
+    .https.onCall(async (data, context) => {
+      return startBattleHandler({
+        data,
+        auth: context.auth || null,
+        rawRequest: context.rawRequest || null,
+      });
+    });
+
+exports.battleActionLegacy = functionsV1
+    .region("us-central1")
+    .https.onCall(async (data, context) => {
+      return battleActionHandler({
+        data,
+        auth: context.auth || null,
+        rawRequest: context.rawRequest || null,
+      });
+    });
