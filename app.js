@@ -2215,6 +2215,171 @@ async function resetDailyQuestsIfNeeded() {
    ADVENTURES AND GUILDMASTER TEST LAB
 ------------------------------------------------- */
 
+const LOCAL_BATTLE_ADVENTURES = {
+  forest: {energy: 5, sleep: 1, xp: 15, gold: 10, enemies: [
+    {name: "Moss Slime", icon: "🟢", hp: 24, attack: 5, defense: 1},
+    {name: "Trail Goblin", icon: "👺", hp: 30, attack: 6, defense: 2}
+  ]},
+  ruins: {energy: 8, sleep: 2, xp: 28, gold: 20, enemies: [
+    {name: "Ruins Skeleton", icon: "💀", hp: 40, attack: 8, defense: 3},
+    {name: "Stone Beetle", icon: "🪲", hp: 48, attack: 7, defense: 5}
+  ]},
+  vault: {energy: 12, sleep: 3, xp: 45, gold: 35, enemies: [
+    {name: "Arcane Wisp", icon: "🔵", hp: 58, attack: 10, defense: 5},
+    {name: "Vault Sentinel", icon: "🗿", hp: 72, attack: 11, defense: 7}
+  ]}
+};
+
+const LOCAL_BATTLE_SKILLS = {
+  warrior: {name: "Power Strike", cost: 3, kind: "physical", multiplier: 1.8},
+  rogue: {name: "Flurry", cost: 3, kind: "physical", multiplier: 1.65},
+  mage: {name: "Arc Bolt", cost: 3, kind: "magic", multiplier: 1.85},
+  ranger: {name: "Piercing Shot", cost: 3, kind: "physical", multiplier: 1.75},
+  guardian: {name: "Shield Bash", cost: 3, kind: "physical", multiplier: 1.55},
+  royal: {name: "Radiant Burst", cost: 3, kind: "magic", multiplier: 1.75}
+};
+
+async function startLocalBattle(kidId, adventureId) {
+  const adventure = LOCAL_BATTLE_ADVENTURES[adventureId];
+  if (!adventure) throw new Error("Unknown adventure.");
+
+  const kidSnap = await getDoc(doc(db, "kids", kidId));
+  if (!kidSnap.exists()) throw new Error("Adventurer not found.");
+  const kid = { kidId, ...kidSnap.data() };
+  const energy = Math.min(MAX_ENERGY, Number(kid.energy ?? MAX_ENERGY));
+  const sleepiness = currentSleepiness(kid);
+
+  if (energy < adventure.energy) throw new Error("Not enough energy. Eat some quest food first.");
+  if (sleepiness + adventure.sleep > MAX_SLEEPINESS) throw new Error("Too sleepy to adventure again today.");
+
+  const stats = getClassStats(kid);
+  const level = Math.max(1, Number(kid.level || 1));
+  const maxHp = 30 + level * 3 + Math.round(Number(stats.courage || 0) * 3.5);
+  const maxSp = Math.min(30, 5 + Math.floor(level / 2) + Math.floor(Number(stats.wisdom || 0) / 3));
+  const magicBasic = Number(stats.wisdom || 0) > Number(stats.strength || 0);
+  const skill = LOCAL_BATTLE_SKILLS[kid.classId] || LOCAL_BATTLE_SKILLS.warrior;
+  const baseEnemy = adventure.enemies[Math.floor(Math.random() * adventure.enemies.length)];
+  const enemy = {
+    ...baseEnemy,
+    maxHp: Math.round(baseEnemy.hp + Math.max(0, level - 1) * 5.5),
+    attack: Math.round(baseEnemy.attack + Math.max(0, level - 1) * 0.75),
+    defense: Math.round(baseEnemy.defense + Math.max(0, level - 1) * 0.35)
+  };
+
+  await updateDoc(doc(db, "kids", kidId), {
+    energy: energy - adventure.energy,
+    sleepiness: sleepiness + adventure.sleep,
+    sleepinessDate: getTodayKey(),
+    lastAdventureAt: new Date().toISOString()
+  });
+
+  return {
+    local: true,
+    adventureId,
+    status: "active",
+    turn: 1,
+    playerStats: stats,
+    player: {
+      name: kid.name || kidId,
+      hp: maxHp,
+      maxHp,
+      sp: maxSp,
+      maxSp,
+      basicName: magicBasic ? "Spark" : "Attack",
+      basicKind: magicBasic ? "magic" : "physical",
+      skill
+    },
+    enemy: {
+      name: enemy.name,
+      icon: enemy.icon,
+      hp: enemy.maxHp,
+      maxHp: enemy.maxHp,
+      attack: enemy.attack,
+      defense: enemy.defense
+    },
+    log: [`${kid.name || kidId} encountered ${enemy.name}!`],
+    rewards: null
+  };
+}
+
+async function resolveLocalBattleAction(kidId, battle, action) {
+  if (battle.status !== "active") return battle;
+
+  const stats = battle.playerStats || {};
+  const player = {...battle.player};
+  const enemy = {...battle.enemy};
+  const log = [...(battle.log || [])];
+  const skill = player.skill || LOCAL_BATTLE_SKILLS.warrior;
+  let guarding = false;
+
+  if (action === "defend") {
+    guarding = true;
+    player.sp = Math.min(Number(player.maxSp || 0), Number(player.sp || 0) + 1);
+    log.push(`${player.name} defends and recovers 1 SP.`);
+  } else {
+    const isSkill = action === "skill";
+    if (isSkill && Number(player.sp || 0) < Number(skill.cost || 0)) throw new Error("Not enough SP.");
+    const kind = isSkill ? skill.kind : player.basicKind;
+    const statValue = kind === "magic" ? Number(stats.wisdom || 0) : Number(stats.strength || 0);
+    const multiplier = isSkill ? Number(skill.multiplier || 1.5) : 1;
+    const variance = 0.9 + Math.random() * 0.2;
+    let damage = Math.max(1, Math.round((statValue * multiplier + Number(stats.agility || 0) * 0.15) * variance - Number(enemy.defense || 0)));
+    const critChance = Math.min(0.28, 0.04 + Number(stats.luck || 0) * 0.006);
+    const crit = Math.random() < critChance;
+    if (crit) damage = Math.round(damage * 1.6);
+    enemy.hp = Math.max(0, Number(enemy.hp || 0) - damage);
+    if (isSkill) player.sp = Number(player.sp || 0) - Number(skill.cost || 0);
+    log.push(`${player.name} uses ${isSkill ? skill.name : player.basicName} for ${damage} damage${crit ? " — critical hit!" : "!"}`);
+  }
+
+  let status = "active";
+  let rewards = null;
+
+  if (Number(enemy.hp || 0) <= 0) {
+    status = "won";
+    const adventure = LOCAL_BATTLE_ADVENTURES[battle.adventureId] || LOCAL_BATTLE_ADVENTURES.forest;
+    const rewardRoll = 0.9 + Math.random() * 0.2;
+    const xp = Math.max(1, Math.round(adventure.xp * rewardRoll));
+    const gold = Math.max(1, Math.round(adventure.gold * rewardRoll));
+    const kidSnap = await getDoc(doc(db, "kids", kidId));
+    const kid = kidSnap.data() || {};
+    const newXp = Number(kid.xp || 0) + xp;
+    const level = Math.floor(newXp / 100) + 1;
+    await updateDoc(doc(db, "kids", kidId), {
+      xp: newXp,
+      gold: Number(kid.gold || 0) + gold,
+      level
+    });
+    rewards = {xp, gold, level};
+    log.push(`${enemy.name} is defeated! +${xp} XP, +${gold} Gold.`);
+  } else {
+    const dodgeChance = Math.min(0.25, Number(stats.agility || 0) * 0.006);
+    if (Math.random() < dodgeChance) {
+      log.push(`${player.name} dodges ${enemy.name}'s attack!`);
+    } else {
+      const courageReduction = Math.floor(Number(stats.courage || 0) * 0.16);
+      let enemyDamage = Math.max(1, Math.round(Number(enemy.attack || 1) * (0.9 + Math.random() * 0.2)) - courageReduction);
+      if (guarding) enemyDamage = Math.max(1, Math.ceil(enemyDamage / 2));
+      player.hp = Math.max(0, Number(player.hp || 0) - enemyDamage);
+      log.push(`${enemy.name} hits for ${enemyDamage} damage${guarding ? " through your guard." : "."}`);
+    }
+    if (Number(player.hp || 0) <= 0) {
+      status = "lost";
+      log.push(`${player.name} is defeated and returns to the Guild Hall.`);
+    }
+  }
+
+  return {
+    ...battle,
+    status,
+    turn: Number(battle.turn || 1) + 1,
+    player,
+    enemy,
+    log: log.slice(-12),
+    rewards
+  };
+}
+
 async function loadAdventureScreen(kidId) {
   setAppTheme("kid");
   try {
@@ -2264,11 +2429,10 @@ async function loadAdventureScreen(kidId) {
       button.addEventListener("click", async () => {
         button.disabled = true;
         try {
-          const result = await startBattleCall({ kidId, adventureId: button.dataset.adventureId });
-          await renderBattleScreen(kidId, result?.data || {});
+          const battle = await startLocalBattle(kidId, button.dataset.adventureId);
+          await renderBattleScreen(kidId, battle);
         } catch (err) {
-          const detail = err?.message || err?.details || err?.code || "Adventure could not start.";
-          alert(detail);
+          alert(err?.message || "Adventure could not start.");
           button.disabled = false;
         }
       });
@@ -2300,7 +2464,6 @@ async function renderBattleScreen(kidId, battle) {
           <h1>Battle</h1>
           <p>Turn ${Number(battle.turn || 1)}</p>
         </header>
-
         <section class="battle-stage">
           <article class="battle-fighter enemy">
             <div class="battle-enemy-art">${escapeHtml(enemy.icon || "👾")}</div>
@@ -2308,9 +2471,7 @@ async function renderBattleScreen(kidId, battle) {
             <div class="battle-meter"><div class="battle-meter-fill hp" style="width:${enemyHpPct}%"></div></div>
             <small>HP ${Number(enemy.hp || 0)} / ${Number(enemy.maxHp || 0)}</small>
           </article>
-
           <div class="battle-versus">VS</div>
-
           <article class="battle-fighter player">
             <div class="battle-player-art">${renderCharacterThumbnail(kid)}</div>
             <strong>${escapeHtml(player.name || kid.name || kidId)}</strong>
@@ -2320,14 +2481,10 @@ async function renderBattleScreen(kidId, battle) {
             <small>SP ${Number(player.sp || 0)} / ${Number(player.maxSp || 0)}</small>
           </article>
         </section>
-
         <section class="card battle-log-card">
           <h2>Battle Log</h2>
-          <div class="battle-log">
-            ${(battle.log || []).slice(-6).map(line => `<p>${escapeHtml(line)}</p>`).join("")}
-          </div>
+          <div class="battle-log">${(battle.log || []).slice(-6).map(line => `<p>${escapeHtml(line)}</p>`).join("")}</div>
         </section>
-
         ${finished ? `
           <section class="card battle-result-card ${won ? "victory" : "defeat"}">
             <h2>${won ? "🏆 Victory!" : "💤 Defeated"}</h2>
@@ -2339,24 +2496,11 @@ async function renderBattleScreen(kidId, battle) {
           </section>
         ` : `
           <section class="battle-actions">
-            <button class="battle-action-btn basic" type="button" data-battle-action="basic">
-              <span>⚔️</span>
-              <strong>${escapeHtml(player.basicName || "Attack")}</strong>
-              <small>Free basic action</small>
-            </button>
-            <button class="battle-action-btn skill" type="button" data-battle-action="skill" ${Number(player.sp || 0) < Number(skill.cost || 0) ? "disabled" : ""}>
-              <span>✨</span>
-              <strong>${escapeHtml(skill.name || "Special Move")}</strong>
-              <small>${Number(skill.cost || 0)} SP</small>
-            </button>
-            <button class="battle-action-btn defend" type="button" data-battle-action="defend">
-              <span>🛡️</span>
-              <strong>Defend</strong>
-              <small>Half damage • +1 SP</small>
-            </button>
+            <button class="battle-action-btn basic" type="button" data-battle-action="basic"><span>⚔️</span><strong>${escapeHtml(player.basicName || "Attack")}</strong><small>Free basic action</small></button>
+            <button class="battle-action-btn skill" type="button" data-battle-action="skill" ${Number(player.sp || 0) < Number(skill.cost || 0) ? "disabled" : ""}><span>✨</span><strong>${escapeHtml(skill.name || "Special Move")}</strong><small>${Number(skill.cost || 0)} SP</small></button>
+            <button class="battle-action-btn defend" type="button" data-battle-action="defend"><span>🛡️</span><strong>Defend</strong><small>Half damage • +1 SP</small></button>
           </section>
         `}
-
         <button id="battleRetreatBtn" type="button" class="battle-retreat-btn">${finished ? "← Back to Adventures" : "Retreat from Battle"}</button>
       </main>`;
 
@@ -2364,12 +2508,8 @@ async function renderBattleScreen(kidId, battle) {
       button.addEventListener("click", async () => {
         document.querySelectorAll(".battle-action-btn").forEach(item => { item.disabled = true; });
         try {
-          const result = await battleActionCall({
-            kidId,
-            sessionId: battle.sessionId,
-            action: button.dataset.battleAction
-          });
-          await renderBattleScreen(kidId, result?.data || {});
+          const nextBattle = await resolveLocalBattleAction(kidId, battle, button.dataset.battleAction);
+          await renderBattleScreen(kidId, nextBattle);
         } catch (err) {
           alert(err?.message || "That battle action failed.");
           await renderBattleScreen(kidId, battle);
