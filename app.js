@@ -1104,8 +1104,8 @@ function calculateCurrentStreak(kid, quests, history, todayKey = getTodayKey()) 
 
 async function refreshAllStreaks() {
   const [kidsSnap, questSnap, history] = await Promise.all([
-    getDocs(collection(db, 'kids')),
-    getDocs(collection(db, 'quests')),
+    getDocs(collection(db, "kids")),
+    getDocs(collection(db, "quests")),
     getAllHistory()
   ]);
 
@@ -1114,18 +1114,33 @@ async function refreshAllStreaks() {
   const quests = [];
   questSnap.forEach(item => quests.push({ choreId: item.id, ...item.data() }));
 
+  const todayKey = getTodayKey();
   const updates = [];
   kids.forEach(kid => {
-    const result = calculateCurrentStreak(kid, quests, history);
+    if (kid.modProfile === true) return;
+    const result = calculateCurrentStreak(kid, quests, history, todayKey);
     const current = Number(kid.currentStreak || 0);
     const best = Math.max(Number(kid.bestStreak || 0), result.streak);
-    if (current !== result.streak || Number(kid.bestStreak || 0) !== best || (kid.lastStreakDate || '') !== result.latestQualifiedDate) {
-      updates.push(updateDoc(doc(db, 'kids', kid.kidId), {
-        currentStreak: result.streak,
-        bestStreak: best,
-        lastStreakDate: result.latestQualifiedDate,
-        streakUpdatedAt: new Date().toISOString()
-      }));
+    const todayResult = didKidQualifyForStreak(kid, quests, history, todayKey);
+    const shouldAwardBonus = todayResult.requiredDay && todayResult.qualified && kid.lastStreakBonusDate !== todayKey;
+
+    const patch = {};
+    if (current !== result.streak) patch.currentStreak = result.streak;
+    if (Number(kid.bestStreak || 0) !== best) patch.bestStreak = best;
+    if ((kid.lastStreakDate || "") !== result.latestQualifiedDate) patch.lastStreakDate = result.latestQualifiedDate;
+
+    if (shouldAwardBonus) {
+      const foodId = streakFoodIdForKid(kid);
+      const foodInventory = kid.foodInventory && typeof kid.foodInventory === "object" ? { ...kid.foodInventory } : {};
+      foodInventory[foodId] = Number(foodInventory[foodId] || 0) + 1;
+      patch.foodInventory = foodInventory;
+      patch.lastStreakBonusDate = todayKey;
+      patch.lastStreakBonusItem = foodId;
+    }
+
+    if (Object.keys(patch).length) {
+      patch.streakUpdatedAt = new Date().toISOString();
+      updates.push(updateDoc(doc(db, "kids", kid.kidId), patch));
     }
   });
   await Promise.all(updates);
@@ -2365,22 +2380,33 @@ async function approveSubmissionCore(submissionId) {
     const quest = questSnap.data();
     const participants = Array.from(new Set(submission.participantIds || [submission.submittedBy]));
     const isFullReward = quest.kidId !== ANYONE_ID && participants.includes(quest.kidId) && submission.submittedBy === quest.kidId;
-    const rewardPoolXp = isFullReward ? Number(quest.xp || 0) : Math.round(Number(quest.xp || 0) / 2);
-    const rewardPoolGold = isFullReward ? Number(quest.gold || 0) : Math.round(Number(quest.gold || 0) / 2);
-    const xpShares = splitWholeReward(rewardPoolXp, participants.length);
-    const goldShares = splitWholeReward(rewardPoolGold, participants.length);
+    const rewardPoolXp = 0;
+    const rewardPoolGold = 0;
+    const xpShares = participants.map(() => 0);
+    const goldShares = participants.map(() => 0);
+    const foodRewards = [];
 
     for (let i = 0; i < participants.length; i++) {
       const kidRef = doc(db, "kids", participants[i]);
       const kidSnap = await getDoc(kidRef);
       if (!kidSnap.exists()) continue;
-      const kid = kidSnap.data();
-      const newXp = Number(kid.xp || 0) + xpShares[i];
+      const kid = { kidId: participants[i], ...kidSnap.data() };
+      const fullFoodReward = isFullReward && participants[i] === quest.kidId;
+      const foodId = questFoodRewardId(kid, quest, fullFoodReward);
+      const food = foodCatalogForKid(kid)[foodId];
+      const foodInventory = kid.foodInventory && typeof kid.foodInventory === "object" ? { ...kid.foodInventory } : {};
+      foodInventory[foodId] = Number(foodInventory[foodId] || 0) + 1;
+
       await updateDoc(kidRef, {
-        xp: newXp,
-        gold: Number(kid.gold || 0) + goldShares[i],
-        level: Math.floor(newXp / 100) + 1,
+        foodInventory,
         lifetimeQuests: Number(kid.lifetimeQuests || 0) + 1
+      });
+
+      foodRewards.push({
+        kidId: participants[i],
+        foodId,
+        foodName: food?.name || foodId,
+        energy: Number(food?.energy || 0)
       });
     }
 
@@ -2392,7 +2418,7 @@ async function approveSubmissionCore(submissionId) {
       participantIds: participants, questDate: submission.questDate || getTodayKey(),
       periodKey: submission.periodKey || getQuestPeriodKey({ ...quest, choreId: submission.questId }),
       scheduleType: submission.scheduleType || getQuestScheduleType(quest),
-      approvedAt, rewardPoolXp, rewardPoolGold, xpShares, goldShares,
+      approvedAt, rewardPoolXp, rewardPoolGold, xpShares, goldShares, foodRewards,
       isSideQuest: !isFullReward
     });
 
@@ -2456,7 +2482,7 @@ async function loadChildDetail(kidId, user) {
       </div></section>
       <section class="card"><h2>Main Quests</h2>${main.length ? main.map(q => {
         const done=doneByQuest.has(q.choreId); const pending=pendingForKid.some(s=>s.questId===q.choreId);
-        return `<div class="quest"><div class="quest-icon">${done?'✅':pending?'⏳':'⬜'}</div><div class="quest-info"><strong>${escapeHtml(q.name||'Quest')}</strong><span>+${Number(q.xp||0)} XP • +${Number(q.gold||0)} Gold</span><small class="status ${done?'status-approved':pending?'status-pending':'status-ready'}">${done?'Completed':pending?'Pending approval':'Still remaining'}</small></div></div>`;
+        return `<div class="quest"><div class="quest-icon">${done?'✅':pending?'⏳':'⬜'}</div><div class="quest-info"><strong>${escapeHtml(q.name||'Quest')}</strong><span>Adventure food on approval</span><small class="status ${done?'status-approved':pending?'status-pending':'status-ready'}">${done?'Completed':pending?'Pending approval':'Still remaining'}</small></div></div>`;
       }).join('') : '<p>No Main Quests assigned.</p>'}</section>
       <section class="card"><h2>Recent Activity Today</h2>${recent.length ? recent.map(h=>`<div class="quest"><div class="quest-icon">🏆</div><div class="quest-info"><strong>${escapeHtml(h.questName||'Quest')}</strong><span>${h.isSideQuest?'Side Quest':'Main Quest'} • ${escapeHtml((h.participantIds||[]).map(id=>kids.find(k=>k.kidId===id)?.name||id).join(', '))}</span><small class="status status-approved">Approved ${formatDateTime(h.approvedAt)}</small></div></div>`).join('') : '<p>No approved quests today.</p>'}</section>
       <button id="detailBackBtn" type="button" style="width:100%;">← Back to Guild Hall</button>
