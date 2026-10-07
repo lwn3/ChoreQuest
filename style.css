@@ -3410,17 +3410,43 @@ body.kid-theme .toast {
   top: max(10px, env(safe-area-inset-top));
   right: 10px;
   z-index: 10000;
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  background: rgba(12, 18, 36, .72);
-  border: 1px solid rgba(255,255,255,.10);
+  display: grid;
+  grid-template-columns: repeat(3, 34px);
+  align-items: center;
+  width: 102px;
+  height: 38px;
+  padding: 2px;
+  background: rgba(12, 18, 36, .52);
+  border: 0;
   border-radius: 999px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  box-shadow: 0 8px 24px rgba(0,0,0,.14);
   backdrop-filter: blur(16px);
 }
 
+.theme-slider-indicator {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(138,99,255,.92);
+  box-shadow: 0 5px 14px rgba(69,60,170,.28);
+  transition: transform 180ms ease;
+  pointer-events: none;
+}
+
+.theme-mode-control[data-selected="auto"] .theme-slider-indicator {
+  transform: translateX(34px);
+}
+
+.theme-mode-control[data-selected="night"] .theme-slider-indicator {
+  transform: translateX(68px);
+}
+
 .theme-mode-control button {
+  position: relative;
+  z-index: 1;
   display: grid;
   place-items: center;
   width: 34px;
@@ -3429,7 +3455,7 @@ body.kid-theme .toast {
   min-height: 34px;
   padding: 0;
   color: #cbd5eb;
-  font-size: .8rem;
+  font-size: .82rem;
   font-weight: 900;
   background: transparent;
   border: 0;
@@ -3439,8 +3465,8 @@ body.kid-theme .toast {
 
 .theme-mode-control button.active {
   color: #fff;
-  background: rgba(138,99,255,.75);
-  box-shadow: 0 4px 12px rgba(82,72,180,.28);
+  background: transparent;
+  box-shadow: none;
 }
 
 body.day-theme {
@@ -3534,10 +3560,13 @@ body.day-theme .bulk-review-check {
   border-color: rgba(37,57,92,.09);
 }
 
-body.day-theme .account-header,
-body.day-theme .theme-mode-control {
+body.day-theme .account-header {
   background: rgba(255,255,255,.82);
   border-color: rgba(37,57,92,.10);
+}
+
+body.day-theme .theme-mode-control {
+  background: rgba(255,255,255,.66);
 }
 
 body.day-theme .theme-mode-control button {
@@ -3546,6 +3575,10 @@ body.day-theme .theme-mode-control button {
 
 body.day-theme .theme-mode-control button.active {
   color: #fff;
+  background: transparent;
+}
+
+body.day-theme .theme-slider-indicator {
   background: #6f56e8;
 }
 
