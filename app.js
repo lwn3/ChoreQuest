@@ -70,9 +70,52 @@ async function userCanAccessKid(kidId) {
 }
 
 
+const THEME_PREF_KEY = "chorequestTheme";
+const THEME_OPTIONS = ["day", "night", "auto"];
+
+function resolvedThemePreference() {
+  const stored = localStorage.getItem(THEME_PREF_KEY);
+  const preference = THEME_OPTIONS.includes(stored) ? stored : "auto";
+  if (preference !== "auto") return preference;
+  const hour = new Date().getHours();
+  return hour >= 7 && hour < 19 ? "day" : "night";
+}
+
+function applyThemePreference() {
+  const resolved = resolvedThemePreference();
+  document.body.classList.add("kid-theme");
+  document.body.classList.toggle("day-theme", resolved === "day");
+  document.body.classList.toggle("night-theme", resolved === "night");
+  document.querySelectorAll(".theme-choice").forEach(button => {
+    button.classList.toggle("active", button.dataset.themeChoice === (localStorage.getItem(THEME_PREF_KEY) || "auto"));
+  });
+}
+
+function ensureThemeControls() {
+  if (document.getElementById("themeModeControl")) return;
+  const control = document.createElement("div");
+  control.id = "themeModeControl";
+  control.className = "theme-mode-control";
+  control.setAttribute("aria-label", "Theme");
+  control.innerHTML = `
+    <button class="theme-choice" type="button" data-theme-choice="day" title="Day mode">☀️</button>
+    <button class="theme-choice" type="button" data-theme-choice="night" title="Night mode">🌙</button>
+    <button class="theme-choice" type="button" data-theme-choice="auto" title="Auto: day 7 AM–7 PM">A</button>`;
+  document.body.appendChild(control);
+  control.querySelectorAll(".theme-choice").forEach(button => {
+    button.addEventListener("click", () => {
+      localStorage.setItem(THEME_PREF_KEY, button.dataset.themeChoice);
+      applyThemePreference();
+    });
+  });
+  applyThemePreference();
+}
+
 function setAppTheme(mode = "default") {
   document.body.classList.add("kid-theme");
   document.body.classList.toggle("parent-theme", mode === "parent");
+  applyThemePreference();
+  requestAnimationFrame(ensureThemeControls);
 }
 
 /* -------------------------------------------------
@@ -1328,6 +1371,16 @@ async function loadKidDashboard(kidId) {
       }
     });
 
+    const allScheduledQuests = [...mainQuests, ...sideQuests];
+    const byQuestId = Object.fromEntries(allScheduledQuests.map(item => [item.choreId, item]));
+    allScheduledQuests.forEach(quest => {
+      const requirements = parentQuestRequirements(quest, allScheduledQuests);
+      quest.dueChildCount = requirements.dueChildren.length;
+      quest.incompleteChildCount = requirements.incomplete.length;
+      quest.isLockedBySubtasks = requirements.incomplete.length > 0;
+      quest.parentName = quest.parentQuestId ? (byQuestId[quest.parentQuestId]?.name || "") : "";
+    });
+
     renderDashboard(kid, mainQuests, sideQuests, kids);
   } catch (err) {
     showError("Firebase error: " + err.message);
@@ -1938,19 +1991,56 @@ function renderClassScreen(kid) {
   document.getElementById("classScreenBackBtn").addEventListener("click", () => loadKidDashboard(kid.kidId));
 }
 
+function scheduledDescendantsForQuest(parentQuestId, allQuests, date = new Date()) {
+  const result = [];
+  const walk = parentId => {
+    allQuests.filter(item => item.parentQuestId === parentId).forEach(child => {
+      if (child.archived !== true && child.active !== false && isQuestScheduledToday(child, date)) {
+        result.push(child);
+      }
+      walk(child.choreId);
+    });
+  };
+  walk(parentQuestId);
+  return result;
+}
+
+function parentQuestRequirements(quest, allQuests) {
+  const dueChildren = scheduledDescendantsForQuest(quest.choreId, allQuests);
+  const incomplete = dueChildren.filter(child => !child.completedToday);
+  return { dueChildren, incomplete };
+}
+
 function questCard(quest, currentKidId) {
   const isMain = quest.kidId === currentKidId;
+  const isSubtask = Boolean(quest.parentQuestId);
+  const locked = !quest.completedToday && !quest.pendingByCurrentKid && Boolean(quest.isLockedBySubtasks);
+  const rewardText = isSubtask
+    ? "Reward is bundled with the parent task"
+    : quest.dueChildCount
+      ? `Includes this task + ${quest.dueChildCount} due subtask reward${quest.dueChildCount === 1 ? "" : "s"}`
+      : "Adventure food on approval";
+
+  let statusText = isMain ? "Your responsibility" : quest.kidId === ANYONE_ID ? "Available to anyone" : "Help another adventurer";
+  if (quest.completedToday) statusText = "Completed for this schedule";
+  else if (quest.pendingByCurrentKid) statusText = "Your claim is awaiting approval";
+  else if (locked) statusText = `Finish ${quest.incompleteChildCount} due subtask${quest.incompleteChildCount === 1 ? "" : "s"} first`;
+
   return `
-    <div class="quest ${quest.parentQuestId ? "quest-subtask" : ""}">
-      <div class="quest-icon">${quest.completedToday ? "✅" : iconForQuest(quest.name || "")}</div>
+    <div class="quest ${isSubtask ? "quest-subtask" : ""} ${locked ? "quest-locked" : ""}">
+      <div class="quest-icon">${quest.completedToday ? "✅" : locked ? "🔒" : iconForQuest(quest.name || "")}</div>
       <div class="quest-info">
         <strong>${escapeHtml(quest.name || "Unnamed Quest")}</strong>
-        <span>${escapeHtml(scheduleLabel(quest))} • ${escapeHtml(dueLabel(quest))} • Adventure food on approval${isMain ? "" : " • helper snack"}</span>
-        <small class="status ${quest.completedToday ? "status-approved" : quest.pendingByCurrentKid ? "status-pending" : "status-ready"}">
-          ${quest.completedToday ? "Completed for this schedule" : quest.pendingByCurrentKid ? "Your claim is awaiting approval" : isMain ? "Your responsibility" : quest.kidId === ANYONE_ID ? "Available to anyone" : "Help another adventurer"}
-        </small>
+        <span>${escapeHtml(scheduleLabel(quest))} • ${escapeHtml(dueLabel(quest))} • ${escapeHtml(rewardText)}${isMain ? "" : " • helper snack"}</span>
+        <small class="status ${quest.completedToday ? "status-approved" : quest.pendingByCurrentKid ? "status-pending" : "status-ready"}">${escapeHtml(statusText)}</small>
       </div>
-      ${quest.completedToday ? '<button class="approved" disabled>Done</button>' : quest.pendingByCurrentKid ? '<button class="disabled" disabled>Claimed</button>' : `<button class="complete-btn" type="button" data-chore-id="${escapeAttribute(quest.choreId)}">Complete</button>`}
+      ${quest.completedToday
+        ? '<button class="approved" disabled>Done</button>'
+        : quest.pendingByCurrentKid
+          ? '<button class="disabled" disabled>Claimed</button>'
+          : locked
+            ? '<button class="disabled" disabled>Locked</button>'
+            : `<button class="complete-btn" type="button" data-chore-id="${escapeAttribute(quest.choreId)}">Complete</button>`}
     </div>`;
 }
 
@@ -1960,6 +2050,24 @@ async function openQuestSubmission(choreId, currentKidId, allKids) {
     const questSnap = await getDoc(doc(db, "quests", choreId));
     if (!questSnap.exists()) { alert("Quest not found."); return; }
     const quest = { choreId, ...questSnap.data() };
+    const [allQuestSnap, history] = await Promise.all([
+      getDocs(collection(db, "quests")),
+      getAllHistory()
+    ]);
+    const scheduled = [];
+    allQuestSnap.forEach(item => {
+      const candidate = { choreId: item.id, ...item.data() };
+      if (candidate.archived === true || candidate.active === false || !isQuestScheduledToday(candidate)) return;
+      candidate.completedToday = isQuestCompletedForCurrentPeriod(candidate, history);
+      scheduled.push(candidate);
+    });
+    const required = scheduledDescendantsForQuest(choreId, scheduled);
+    const incomplete = required.filter(item => !item.completedToday);
+    if (incomplete.length) {
+      alert(`Finish today's subtasks first: ${incomplete.map(item => item.name || "Subtask").join(", ")}`);
+      await loadKidDashboard(currentKidId);
+      return;
+    }
     const helpersAllowed = quest.allowHelpers !== false;
     document.body.innerHTML = `
       <main class="app">
