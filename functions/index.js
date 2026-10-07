@@ -473,15 +473,15 @@ exports.startBattle = onCall({maxInstances: 3}, async (request) => {
 
     if (energy < adventure.energy) {
       throw new HttpsError(
-        "failed-precondition",
-        "Not enough energy. Eat some quest food first."
+          "failed-precondition",
+          "Not enough energy. Eat some quest food first.",
       );
     }
 
     if (sleepiness + adventure.sleepiness > MAX_SLEEPINESS) {
       throw new HttpsError(
-        "failed-precondition",
-        "Too sleepy to adventure again today."
+          "failed-precondition",
+          "Too sleepy to adventure again today.",
       );
     }
 
@@ -530,8 +530,8 @@ exports.startBattle = onCall({maxInstances: 3}, async (request) => {
     console.error("startBattle failed", err);
     if (err instanceof HttpsError) throw err;
     throw new HttpsError(
-      "internal",
-      `Battle could not start: ${err?.message || "unknown error"}`
+        "internal",
+        `Battle could not start: ${err?.message || "unknown error"}`,
     );
   }
 });
