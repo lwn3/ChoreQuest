@@ -993,6 +993,8 @@ function isQuestScheduledToday(quest, date = new Date()) {
   }
 
   if (scheduleType === "weekdays") {
+    const startKey = questStartDateKey(quest);
+    if (daysBetweenDateKeys(startKey, todayKey) < 0) return false;
     const weekdays = Array.isArray(quest.weekdays) ? quest.weekdays.map(Number) : [];
     return weekdays.includes(date.getDay());
   }
@@ -1939,7 +1941,7 @@ function renderClassScreen(kid) {
 function questCard(quest, currentKidId) {
   const isMain = quest.kidId === currentKidId;
   return `
-    <div class="quest">
+    <div class="quest ${quest.parentQuestId ? "quest-subtask" : ""}">
       <div class="quest-icon">${quest.completedToday ? "✅" : iconForQuest(quest.name || "")}</div>
       <div class="quest-info">
         <strong>${escapeHtml(quest.name || "Unnamed Quest")}</strong>
@@ -2987,7 +2989,7 @@ async function loadQuestManager(user) {
     <main class="app">
       <header class="hero compact">
         <div class="logo">📋</div>
-        <h1>Quest Manager</h1>
+        <h1>Tasks</h1>
         <p>Loading blueprints...</p>
       </header>
     </main>
@@ -3013,14 +3015,7 @@ async function loadQuestManager(user) {
       });
     });
 
-    quests.sort((a, b) => {
-      const archiveCompare =
-        Number(Boolean(a.archived)) - Number(Boolean(b.archived));
-
-      if (archiveCompare !== 0) return archiveCompare;
-
-      return String(a.name || "").localeCompare(String(b.name || ""));
-    });
+    const orderedQuests = sortQuestsForManager(quests);
 
     const activeCount = quests.filter(quest => quest.archived !== true).length;
     const archivedCount = quests.length - activeCount;
@@ -3031,9 +3026,9 @@ async function loadQuestManager(user) {
 
         <header class="hero compact">
           <div class="logo">📋</div>
-          <h1>Quest Manager</h1>
+          <h1>Tasks</h1>
           <p>
-            ${activeCount} active blueprint${activeCount === 1 ? "" : "s"}
+            ${activeCount} active task${activeCount === 1 ? "" : "s"}
             • ${archivedCount} archived
           </p>
         </header>
@@ -3041,86 +3036,8 @@ async function loadQuestManager(user) {
         <section class="card">
           ${
             quests.length === 0
-              ? "<p>No quests have been created yet.</p>"
-              : quests
-                  .map(
-                    quest => `
-                      <div class="quest">
-                        <div class="quest-icon">
-                          ${quest.archived === true
-                            ? "📦"
-                            : quest.type === "daily"
-                              ? "⚔️"
-                              : "🗺️"}
-                        </div>
-
-                        <div class="quest-info">
-                          <strong>${escapeHtml(
-                            quest.name || "Unnamed Quest"
-                          )}</strong>
-
-                          <span>
-                            ${
-                              scheduleLabel(quest)
-                            }
-                            • ${escapeHtml(dueLabel(quest))}
-                          </span>
-
-                          <small class="status ${
-                            quest.archived === true
-                              ? "status-pending"
-                              : statusClass(quest.status)
-                          }">
-                            ${quest.archived === true
-                              ? "Archived"
-                              : escapeHtml(
-                                  kidNames[quest.kidId] ||
-                                    quest.kidId ||
-                                    "Unassigned"
-                                ) +
-                                ` • ${escapeHtml(questFoodTierLabel(quest))}` +
-                                ` • ${escapeHtml(statusLabel(quest.status))}`
-                            }
-                          </small>
-                        </div>
-
-                        <div class="parent-buttons">
-                          <button
-                            class="edit-quest-btn"
-                            type="button"
-                            data-quest-id="${escapeAttribute(quest.questId)}"
-                            ${quest.archived === true ? "disabled" : ""}
-                            title="Edit quest"
-                          >
-                            ✏️
-                          </button>
-
-                          <button
-                            class="archive-quest-btn"
-                            type="button"
-                            data-quest-id="${escapeAttribute(quest.questId)}"
-                            data-archived="${quest.archived === true ? "true" : "false"}"
-                            title="${quest.archived === true ? "Restore quest" : "Archive quest"}"
-                          >
-                            ${quest.archived === true ? "♻️" : "📦"}
-                          </button>
-
-                          <button
-                            class="delete-quest-btn"
-                            type="button"
-                            data-quest-id="${escapeAttribute(quest.questId)}"
-                            data-quest-name="${escapeAttribute(
-                              quest.name || "Unnamed Quest"
-                            )}"
-                            title="Permanently delete quest"
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      </div>
-                    `
-                  )
-                  .join("")
+              ? "<p>No tasks have been created yet.</p>"
+              : `<div class="task-manager-list">${orderedQuests.map(quest => renderQuestManagerRow(quest, quests, kidNames)).join("")}</div>`
           }
         </section>
 
@@ -3129,7 +3046,7 @@ async function loadQuestManager(user) {
           type="button"
           style="width:100%; margin-bottom:15px;"
         >
-          ➕ New Quest Blueprint
+          ＋ New task
         </button>
 
         <button id="backToGuildHallBtn" type="button">
