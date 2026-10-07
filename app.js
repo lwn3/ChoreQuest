@@ -2208,30 +2208,47 @@ async function startLocalBattle(kidId, adventureId) {
 
   const kidSnap = await getDoc(doc(db, "kids", kidId));
   if (!kidSnap.exists()) throw new Error("Adventurer not found.");
-  const kid = {kidId, ...kidSnap.data()};
+  let kid = {kidId, ...kidSnap.data()};
+  kid = await ensureClassProgressionInitialized(kid);
+
   const energy = Math.min(MAX_ENERGY, Number(kid.energy ?? MAX_ENERGY));
   const sleepiness = currentSleepiness(kid);
-
   if (energy < adventure.energy) throw new Error("Not enough energy. Eat some quest food first.");
   if (sleepiness + adventure.sleep > MAX_SLEEPINESS) throw new Error("Too sleepy to adventure again today.");
 
   const stats = getClassStats(kid);
   const level = Math.max(1, Number(kid.level || 1));
-  const progression = classCombatProgression(kid.classId);
   const passive = combinedCombatPerks(kid);
-  const skills = unlockedCombatSkills(kid);
-  const companions = companionBattleEffects(kid);
-  const baseHp = 30 + level * 3 + Math.round(Number(stats.courage || 0) * 3.5);
-  const maxHp = Math.round(baseHp * Number(passive.maxHpMultiplier || 1));
-  const maxSp = Math.min(36, 5 + Math.floor(level / 2) + Math.floor(Number(stats.wisdom || 0) / 3) + Number(passive.maxSpBonus || 0));
-  const magicBasic = Number(stats.wisdom || 0) > Number(stats.strength || 0);
+  const currentClassId = kid.classId || "noob";
+  const supportIds = (Array.isArray(kid.supportClasses) ? kid.supportClasses : [])
+    .filter(id => id !== currentClassId && classLevelFor(kid, id) > 0)
+    .slice(0, supportSlotCount(kid));
+  const skillRows = [currentClassId, ...supportIds].map((classId, index) => ({
+    classId,
+    className: CLASS_DEFINITIONS[classId]?.name || classId,
+    classIcon: CLASS_DEFINITIONS[classId]?.icon || "✨",
+    classLevel: classLevelFor(kid, classId),
+    support: index > 0,
+    skills: learnedActiveSkills(kid, classId)
+  }));
+
+  const maxCompanions = Math.min(3, 2 + Number(passive.extraCompanion || 0));
+  const companions = companionBattleEffects(kid, maxCompanions);
+  const maxHp = Math.max(1, Math.round(Number(stats.hp || 30) * Number(passive.maxHpMultiplier || 1)));
+  const maxSp = Math.min(40, 5 + Math.floor(level / 4) + Math.floor(Number(stats.wisdom || 0) / 4) + Number(passive.maxSpBonus || 0));
+  const currentStyle = CLASS_DEFINITIONS[currentClassId]?.style || "hybrid";
+  const magicBasic = ["magic", "support", "companion"].includes(currentStyle) ||
+    (currentStyle === "hybrid" && Number(stats.wisdom || 0) > Number(stats.strength || 0));
+
   const baseEnemy = adventure.enemies[Math.floor(Math.random() * adventure.enemies.length)];
   const enemy = {
     ...baseEnemy,
     maxHp: Math.round(baseEnemy.hp + Math.max(0, level - 1) * 5.5),
     attack: Math.round(baseEnemy.attack + Math.max(0, level - 1) * 0.75),
     physicalDefense: Math.round(Number(baseEnemy.physicalDefense || 0) + Math.max(0, level - 1) * 0.30),
-    magicDefense: Math.round(Number(baseEnemy.magicDefense || 0) + Math.max(0, level - 1) * 0.30)
+    magicDefense: Math.round(Number(baseEnemy.magicDefense || 0) + Math.max(0, level - 1) * 0.30),
+    attackDebuffPct: 0,
+    attackDebuffTurns: 0
   };
 
   await updateDoc(doc(db, "kids", kidId), {
@@ -2241,7 +2258,10 @@ async function startLocalBattle(kidId, adventureId) {
     lastAdventureAt: new Date().toISOString()
   });
 
-  const openingLog = [`${kid.name || kidId} encountered ${enemy.name}!`];
+  const openingLog = [
+    `${kid.name || kidId} entered battle as ${CLASS_DEFINITIONS[currentClassId]?.name || "Noob"}!`,
+    `${enemy.name} appeared.`
+  ];
   companions.forEach(companion => openingLog.push(`${companion.icon} ${companion.name} is ready to help.`));
 
   return {
@@ -2250,10 +2270,19 @@ async function startLocalBattle(kidId, adventureId) {
     status: "active",
     turn: 1,
     playerStats: stats,
-    classId: kid.classId,
+    classId: currentClassId,
     passive,
     companions,
     companionUsed: {},
+    counters: {
+      skillUses: 0,
+      critRefundUsed: false,
+      rangedCritRefundUsed: false,
+      lethalSaveUsed: false,
+      firstEnemyAttackDone: false,
+      guaranteedCompanionUsed: false,
+      crossClassDiscountUsed: false
+    },
     player: {
       name: kid.name || kidId,
       hp: maxHp,
@@ -2262,9 +2291,14 @@ async function startLocalBattle(kidId, adventureId) {
       maxSp,
       basicName: magicBasic ? "Spark" : "Attack",
       basicKind: magicBasic ? "magic" : "physical",
-      skills,
+      skillRows,
       guardTurns: 0,
-      evasionTurns: 0
+      evasionTurns: 0,
+      barrier: 0,
+      damageBuffPct: 0,
+      damageBuffTurns: 0,
+      companionBoost: 0,
+      lastSkillKind: ""
     },
     enemy: {
       name: enemy.name,
@@ -2276,7 +2310,9 @@ async function startLocalBattle(kidId, adventureId) {
       attack: enemy.attack,
       physicalDefense: enemy.physicalDefense,
       magicDefense: enemy.magicDefense,
-      dodge: Number(enemy.dodge || 0)
+      dodge: Number(enemy.dodge || 0),
+      attackDebuffPct: 0,
+      attackDebuffTurns: 0
     },
     log: openingLog,
     rewards: null
@@ -2288,28 +2324,68 @@ async function resolveLocalBattleAction(kidId, battle, action, skillId = "") {
 
   const stats = battle.playerStats || {};
   const player = {...battle.player};
+  player.skillRows = Array.isArray(battle.player?.skillRows) ? battle.player.skillRows.map(row => ({...row, skills:[...(row.skills || [])]})) : [];
   const enemy = {...battle.enemy};
   const log = [...(battle.log || [])];
   const companions = Array.isArray(battle.companions) ? battle.companions : [];
   const companionUsed = {...(battle.companionUsed || {})};
+  const counters = {...(battle.counters || {})};
+  const passive = battle.passive || {};
   let guarding = Number(player.guardTurns || 0) > 0;
+  let skipEnemyTurn = false;
   let selectedSkill = null;
+  let selectedRow = null;
+  let critThisTurn = false;
+
+  const allSkillRows = player.skillRows || [];
+  if (action === "skill") {
+    for (const row of allSkillRows) {
+      const found = (row.skills || []).find(skill => skill.id === skillId);
+      if (found) {
+        selectedSkill = found;
+        selectedRow = row;
+        break;
+      }
+    }
+    if (!selectedSkill) throw new Error("That ability is not available.");
+  }
 
   if (action === "defend") {
     guarding = true;
     player.guardTurns = Math.max(1, Number(player.guardTurns || 0));
-    player.sp = Math.min(Number(player.maxSp || 0), Number(player.sp || 0) + 1);
-    log.push(`${player.name} defends and recovers 1 SP.`);
+    const spGain = 1 + Number(passive.defendSpBonus || 0);
+    player.sp = Math.min(Number(player.maxSp || 0), Number(player.sp || 0) + spGain);
+    if (Number(passive.defendBarrierPct || 0) > 0) {
+      player.barrier = Math.max(Number(player.barrier || 0), Math.round(Number(player.maxHp || 0) * Number(passive.defendBarrierPct)));
+    }
+    log.push(`${player.name} defends and recovers ${spGain} SP.`);
   } else {
     const isSkill = action === "skill";
-    selectedSkill = isSkill
-      ? (player.skills || []).find(skill => skill.id === skillId)
-      : null;
-    if (isSkill && !selectedSkill) throw new Error("That ability is not available.");
-    if (isSkill && Number(player.sp || 0) < Number(selectedSkill.cost || 0)) throw new Error("Not enough SP.");
-
     const skill = selectedSkill || {};
-    if (isSkill) player.sp = Number(player.sp || 0) - Number(skill.cost || 0);
+    const kind = isSkill ? (skill.kind || "") : player.basicKind;
+    let cost = isSkill ? Number(skill.cost || 0) : 0;
+
+    if (isSkill && kind === "magic" && !counters.firstSpellUsed && Number(passive.firstSpellDiscount || 0) > 0) {
+      cost = Math.max(0, cost - Number(passive.firstSpellDiscount || 0));
+      counters.firstSpellUsed = true;
+    }
+    if (isSkill && Number(passive.everyThirdDiscount || 0) > 0 && (Number(counters.skillUses || 0) + 1) % 3 === 0) {
+      cost = Math.max(0, cost - Number(passive.everyThirdDiscount || 0));
+    }
+    if (isSkill && selectedRow?.support && Number(passive.firstSupportDiscount || 0) > 0 && !counters.firstSupportDiscountUsed) {
+      cost = Math.max(0, cost - Number(passive.firstSupportDiscount || 0));
+      counters.firstSupportDiscountUsed = true;
+    }
+    if (isSkill && kind === "physical" && player.lastSkillKind === "magic" && Number(passive.crossClassDiscount || 0) > 0 && !counters.crossClassDiscountUsed) {
+      cost = Math.max(0, cost - Number(passive.crossClassDiscount || 0));
+      counters.crossClassDiscountUsed = true;
+    }
+
+    if (isSkill && Number(player.sp || 0) < cost) throw new Error("Not enough SP.");
+    if (isSkill) {
+      player.sp = Number(player.sp || 0) - cost;
+      counters.skillUses = Number(counters.skillUses || 0) + 1;
+    }
 
     if (Number(skill.spRestore || 0) > 0) {
       player.sp = Math.min(Number(player.maxSp || 0), player.sp + Number(skill.spRestore || 0));
@@ -2317,30 +2393,40 @@ async function resolveLocalBattleAction(kidId, battle, action, skillId = "") {
     }
 
     if (Number(skill.healPct || 0) > 0) {
-      let healPct = Number(skill.healPct || 0);
-      if (skill.kindnessHeal) healPct += Math.min(0.18, Number(stats.kindness || 0) * 0.004);
-      healPct += Number(battle.passive?.healBonus || 0);
+      const healPct = Number(skill.healPct || 0) + Number(passive.healBonus || 0) + Number(passive.healingReceivedBonus || 0);
       const heal = Math.max(1, Math.round(Number(player.maxHp || 0) * healPct));
       player.hp = Math.min(Number(player.maxHp || 0), Number(player.hp || 0) + heal);
+      if (Number(passive.healShieldPct || 0) > 0) {
+        player.barrier = Math.max(Number(player.barrier || 0), Math.round(heal * Number(passive.healShieldPct || 0)));
+      }
       log.push(`${player.name} uses ${skill.name} and recovers ${heal} HP.`);
     }
 
     if (Number(skill.guardTurns || 0) > 0) {
       player.guardTurns = Math.max(Number(player.guardTurns || 0), Number(skill.guardTurns));
       guarding = true;
-      log.push(`${player.name} is protected for ${skill.guardTurns} turns.`);
-    }
-    if (skill.guardNext) {
-      player.guardTurns = Math.max(Number(player.guardTurns || 0), 1);
-      guarding = true;
+      log.push(`${player.name} braces for ${skill.guardTurns} turn${Number(skill.guardTurns) === 1 ? "" : "s"}.`);
     }
     if (Number(skill.evasionTurns || 0) > 0) {
       player.evasionTurns = Math.max(Number(player.evasionTurns || 0), Number(skill.evasionTurns));
       log.push(`${player.name} becomes harder to hit.`);
     }
+    if (Number(skill.damageBuffPct || 0) > 0) {
+      player.damageBuffPct = Math.max(Number(player.damageBuffPct || 0), Number(skill.damageBuffPct));
+      player.damageBuffTurns = Math.max(Number(player.damageBuffTurns || 0), Number(skill.damageBuffTurns || 2));
+      log.push(`${player.name}'s power surges.`);
+    }
+    if (Number(skill.companionBoost || 0) > 0) {
+      player.companionBoost = Math.max(Number(player.companionBoost || 0), Number(skill.companionBoost));
+      log.push(`${player.name} strengthens the companion bond.`);
+    }
+    if (Number(skill.enemyAttackDebuff || 0) > 0) {
+      enemy.attackDebuffPct = Math.max(Number(enemy.attackDebuffPct || 0), Number(skill.enemyAttackDebuff));
+      enemy.attackDebuffTurns = Math.max(Number(enemy.attackDebuffTurns || 0), Number(skill.enemyAttackDebuffTurns || 2));
+      log.push(`${enemy.name}'s attack is weakened.`);
+    }
 
-    if (!isSkill || skill.kind) {
-      const kind = isSkill ? skill.kind : player.basicKind;
+    if (!isSkill || kind) {
       const statValue = kind === "magic" ? Number(stats.wisdom || 0) : Number(stats.strength || 0);
       const multiplier = isSkill ? Number(skill.multiplier || 1.5) : 1;
       const rawDefense = kind === "magic" ? Number(enemy.magicDefense || 0) : Number(enemy.physicalDefense || 0);
@@ -2351,32 +2437,63 @@ async function resolveLocalBattleAction(kidId, battle, action, skillId = "") {
         companionUsed.shield_breaker = true;
         log.push(`${breaker.icon} ${breaker.name} uses Shield Breaker!`);
       }
+
       const defense = rawDefense * (1 - Math.min(0.9, armorPierce));
-      const weaknessMultiplier = enemy.weakness === kind ? 1.25 : 1;
-      const damageBonus = kind === "magic"
-        ? Number(battle.passive?.magicDamageBonus || 0)
-        : Number(battle.passive?.physicalDamageBonus || 0);
+      const weaknessHit = enemy.weakness === kind;
+      const weaknessMultiplier = weaknessHit ? 1.25 + Number(passive.weaknessDamageBonus || 0) : 1;
+      let damageBonus = kind === "magic" ? Number(passive.magicDamageBonus || 0) : Number(passive.physicalDamageBonus || 0);
+      damageBonus += Number(player.damageBuffPct || 0);
+      if (Number(player.hp || 0) <= Number(player.maxHp || 0) * 0.50) damageBonus += Number(passive.lowHpDamageBonus || 0);
+      if (Number(player.hp || 0) <= Number(player.maxHp || 0) * 0.35 && Number(passive.lowHpEmpower || 0) > 0) damageBonus += 0.15;
+      if (/elite|boss/i.test(enemy.trait || "")) damageBonus += Number(passive.bossDamageBonus || 0);
+
       const variance = 0.9 + Math.random() * 0.2;
       let damage = Math.max(1, Math.round(((statValue * multiplier + Number(stats.agility || 0) * 0.15) * variance - defense) * weaknessMultiplier * (1 + damageBonus)));
-      const passiveCrit = Number(battle.passive?.critBonus || 0);
-      const critChance = Math.min(0.45, 0.04 + Number(stats.luck || 0) * 0.006 + passiveCrit + Number(skill.critBonus || 0));
+      const critChance = Math.min(0.50, 0.04 + Number(stats.luck || 0) * 0.006 + Number(passive.critBonus || 0) + Number(skill.critBonus || 0));
       const crit = Math.random() < critChance;
+      critThisTurn = crit;
       if (crit) damage = Math.round(damage * 1.6);
+
       if (Math.random() < Number(enemy.dodge || 0)) {
         damage = 0;
         log.push(`${enemy.name} dodges ${player.name}'s attack!`);
       } else {
         enemy.hp = Math.max(0, Number(enemy.hp || 0) - damage);
-        log.push(`${player.name} uses ${isSkill ? skill.name : player.basicName} for ${damage} damage${crit ? " — critical hit!" : ""}${weaknessMultiplier > 1 ? " — weakness!" : "!"}`);
+        log.push(`${player.name} uses ${isSkill ? skill.name : player.basicName} for ${damage} damage${crit ? " — critical hit!" : ""}${weaknessHit ? " — weakness!" : "!"}`);
+
+        if (!isSkill && Number(passive.basicDoubleChance || 0) > 0 && Math.random() < Number(passive.basicDoubleChance)) {
+          const extra = Math.max(1, Math.round(damage * 0.55));
+          enemy.hp = Math.max(0, Number(enemy.hp || 0) - extra);
+          log.push(`Mastery follow-up hits for ${extra} more damage!`);
+        }
 
         const doubleCaster = companions.find(companion => companion.effect === "double_cast");
-        const doubleChance = Math.min(0.45, 0.12 + Number(stats.kindness || 0) * 0.004 + Number(battle.passive?.companionProcBonus || 0));
-        if (doubleCaster && isSkill && kind === "magic" && Math.random() < doubleChance && Number(enemy.hp || 0) > 0) {
+        const guaranteed = Number(passive.guaranteedFirstCompanion || 0) > 0 && !counters.guaranteedCompanionUsed;
+        const doubleChance = Math.min(0.55, 0.12 + Number(stats.kindness || 0) * 0.004 + Number(passive.companionProcBonus || 0) + Number(player.companionBoost || 0));
+        if (doubleCaster && isSkill && kind === "magic" && (guaranteed || Math.random() < doubleChance) && Number(enemy.hp || 0) > 0) {
           const echoDamage = Math.max(1, Math.round(damage * 0.65));
           enemy.hp = Math.max(0, Number(enemy.hp || 0) - echoDamage);
+          companionUsed.double_cast = true;
+          counters.guaranteedCompanionUsed = true;
           log.push(`${doubleCaster.icon} ${doubleCaster.name} echoes the spell for ${echoDamage} damage!`);
         }
       }
+
+      if (crit && Number(passive.critRefund || 0) > 0 && !counters.critRefundUsed) {
+        player.sp = Math.min(Number(player.maxSp || 0), Number(player.sp || 0) + Number(passive.critRefund));
+        counters.critRefundUsed = true;
+        log.push("Critical mastery restores 1 SP.");
+      }
+      if (isSkill && Math.random() < Number(passive.skillSpRefundChance || 0)) {
+        player.sp = Math.min(Number(player.maxSp || 0), Number(player.sp || 0) + 1);
+        log.push("Time mastery refunds 1 SP.");
+      }
+      if (!isSkill && Number(passive.extraActionChance || 0) > 0 && Math.random() < Number(passive.extraActionChance)) {
+        skipEnemyTurn = true;
+        log.push(`${player.name} moves too fast for ${enemy.name} to answer!`);
+      }
+
+      if (isSkill) player.lastSkillKind = kind;
     }
   }
 
@@ -2388,50 +2505,115 @@ async function resolveLocalBattleAction(kidId, battle, action, skillId = "") {
     const adventure = LOCAL_BATTLE_ADVENTURES[battle.adventureId] || LOCAL_BATTLE_ADVENTURES.forest;
     const rewardRoll = 0.9 + Math.random() * 0.2;
     const kidSnap = await getDoc(doc(db, "kids", kidId));
-    const kid = {kidId, ...(kidSnap.data() || {})};
-    const oldLevel = Math.max(1, Number(kid.level || 1));
-    const goldMultiplier = Number(battle.passive?.goldMultiplier || 1);
+    let kid = {kidId, ...(kidSnap.data() || {})};
+    kid = await ensureClassProgressionInitialized(kid);
+
+    const oldCharacterLevel = Math.max(1, Number(kid.level || 1));
+    const currentClassId = kid.classId || "noob";
+    const currentDef = CLASS_DEFINITIONS[currentClassId] || CLASS_DEFINITIONS.noob;
+    const oldClassLevel = classLevelFor(kid, currentClassId);
+    const goldMultiplier = Number(passive.goldMultiplier || 1);
     const xp = Math.max(1, Math.round(adventure.xp * rewardRoll));
     const gold = Math.max(1, Math.round(adventure.gold * rewardRoll * goldMultiplier));
+    const classXpGain = Math.max(8, Math.round(xp * 1.5 * classXpRewardMultiplier(kid)));
     const newXp = Number(kid.xp || 0) + xp;
     const level = Math.floor(newXp / 100) + 1;
+
+    const classXp = {...(kid.classXp || {})};
+    const classLevels = {...(kid.classLevels || {})};
+    const beforeUnlocked = new Set(CLASS_IDS.filter(id => classIsUnlocked(kid, id)));
+    const oldCurrentClassXp = Number(classXp[currentClassId] || 0);
+    const newCurrentClassXp = oldClassLevel >= currentDef.maxLevel ? oldCurrentClassXp : oldCurrentClassXp + classXpGain;
+    const newClassLevel = oldClassLevel >= currentDef.maxLevel
+      ? oldClassLevel
+      : classLevelFromXp(newCurrentClassXp, currentDef.maxLevel);
+    classXp[currentClassId] = newCurrentClassXp;
+    classLevels[currentClassId] = Math.min(currentDef.maxLevel, newClassLevel);
+
+    const progressedKid = {...kid, level, xp:newXp, classXp, classLevels};
+    const afterUnlocked = CLASS_IDS.filter(id => classIsUnlocked(progressedKid, id));
+    const newUnlocks = afterUnlocked.filter(id => !beforeUnlocked.has(id)).map(id => CLASS_DEFINITIONS[id].name);
+    const masteredClasses = Array.from(new Set([
+      ...(Array.isArray(kid.masteredClasses) ? kid.masteredClasses : []),
+      ...(newClassLevel >= currentDef.maxLevel ? [currentClassId] : [])
+    ]));
+
     const dropCompanions = [...companions];
-    if (Number(battle.passive?.lootBonus || 0) > 0) {
-      dropCompanions.push({effect: "treasure_nose"});
-    }
+    if (Number(passive.lootBonus || 0) > 0) dropCompanions.push({effect:"treasure_nose"});
     const drop = rollBattleDrop(kid, battle.adventureId, dropCompanions);
+    let bonusDrop = null;
+    if (Number(passive.bonusLootChance || 0) > 0 && Math.random() < Number(passive.bonusLootChance)) {
+      bonusDrop = rollBattleDrop(kid, battle.adventureId, [{effect:"treasure_nose"}]);
+    }
+
     const inventory = Array.isArray(kid.inventory) ? [...kid.inventory] : [];
     if (drop) inventory.push(drop);
+    if (bonusDrop) inventory.push(bonusDrop);
 
     await updateDoc(doc(db, "kids", kidId), {
       xp: newXp,
       gold: Number(kid.gold || 0) + gold,
       level,
+      classXp,
+      classLevels,
+      masteredClasses,
       inventory
     });
 
-    rewards = {xp, gold, level, levelUp: level > oldLevel, drop};
-    log.push(`${enemy.name} is defeated! +${xp} XP, +${gold} Gold.`);
+    rewards = {
+      xp,
+      gold,
+      level,
+      levelUp: level > oldCharacterLevel,
+      classXp: oldClassLevel >= currentDef.maxLevel ? 0 : classXpGain,
+      className: currentDef.name,
+      classLevel: classLevels[currentClassId],
+      classLevelUp: classLevels[currentClassId] > oldClassLevel,
+      classMastered: classLevels[currentClassId] >= currentDef.maxLevel && oldClassLevel < currentDef.maxLevel,
+      newUnlocks,
+      drop,
+      bonusDrop
+    };
+    log.push(`${enemy.name} is defeated! +${xp} XP, +${gold} Gold, +${rewards.classXp} Class XP.`);
     if (drop) log.push(`Treasure found: ${displayItemName(drop)}!`);
-  } else {
-    const passiveDodge = Number(battle.passive?.dodgeBonus || 0);
+    if (bonusDrop) log.push(`Bonus treasure: ${displayItemName(bonusDrop)}!`);
+    if (newUnlocks.length) log.push(`New class unlocked: ${newUnlocks.join(", ")}!`);
+  } else if (!skipEnemyTurn) {
+    const passiveDodge = Number(passive.dodgeBonus || 0);
     const evasionBonus = Number(player.evasionTurns || 0) > 0 ? 0.18 : 0;
-    const dodgeChance = Math.min(0.42, Number(stats.agility || 0) * 0.006 + passiveDodge + evasionBonus);
+    let dodgeChance = Math.min(0.45, Number(stats.agility || 0) * 0.006 + passiveDodge + evasionBonus);
+    if (!counters.firstEnemyAttackDone) dodgeChance += Number(passive.firstAttackMissBonus || 0);
+    counters.firstEnemyAttackDone = true;
 
     if (Math.random() < dodgeChance) {
       log.push(`${player.name} dodges ${enemy.name}'s attack!`);
+      if (Number(passive.dodgeCounterChance || 0) > 0 && Math.random() < Number(passive.dodgeCounterChance)) {
+        const counterDamage = Math.max(1, Math.round(Number(stats.strength || 1) * 0.75));
+        enemy.hp = Math.max(0, Number(enemy.hp || 0) - counterDamage);
+        log.push(`${player.name} counterattacks for ${counterDamage} damage!`);
+        if (Number(enemy.hp || 0) <= 0) {
+          return resolveLocalBattleAction(kidId, {...battle, player, enemy, companionUsed, counters, log}, "defend");
+        }
+      }
     } else {
       const courageReduction = Math.floor(Number(stats.courage || 0) * 0.16);
-      let enemyDamage = Math.max(1, Math.round(Number(enemy.attack || 1) * (0.9 + Math.random() * 0.2)) - courageReduction);
-      if (guarding) {
-        const guardMultiplier = Number(battle.passive?.guardMultiplier || 0.5);
-        enemyDamage = Math.max(1, Math.ceil(enemyDamage * guardMultiplier));
+      const attackDebuff = Number(enemy.attackDebuffTurns || 0) > 0 ? Number(enemy.attackDebuffPct || 0) : 0;
+      let enemyDamage = Math.max(1, Math.round(Number(enemy.attack || 1) * (1 - attackDebuff) * (0.9 + Math.random() * 0.2)) - courageReduction);
+
+      if (guarding) enemyDamage = Math.max(1, Math.ceil(enemyDamage * 0.5));
+      if (Number(player.barrier || 0) > 0) {
+        const absorbed = Math.min(enemyDamage, Number(player.barrier || 0));
+        enemyDamage -= absorbed;
+        player.barrier = Math.max(0, Number(player.barrier || 0) - absorbed);
+        if (absorbed) log.push(`A barrier absorbs ${absorbed} damage.`);
       }
 
       const guardCompanion = companions.find(companion => companion.effect === "guard");
-      if (guardCompanion && !companionUsed.guard) {
-        enemyDamage = Math.max(1, Math.ceil(enemyDamage / 2));
+      const guaranteed = Number(passive.guaranteedFirstCompanion || 0) > 0 && !counters.guaranteedCompanionUsed;
+      if (guardCompanion && !companionUsed.guard && (guaranteed || Math.random() < Math.min(0.65, 0.25 + Number(passive.companionProcBonus || 0) + Number(player.companionBoost || 0)))) {
+        enemyDamage = Math.max(0, Math.ceil(enemyDamage / 2));
         companionUsed.guard = true;
+        counters.guaranteedCompanionUsed = true;
         log.push(`${guardCompanion.icon} ${guardCompanion.name} jumps in to guard!`);
       }
 
@@ -2447,14 +2629,30 @@ async function resolveLocalBattleAction(kidId, battle, action, skillId = "") {
       log.push(`${secondWind.icon} ${secondWind.name} uses Second Wind and restores ${heal} HP!`);
     }
 
+    if (Number(player.hp || 0) <= 0 && Number(passive.lethalSave || 0) > 0 && !counters.lethalSaveUsed) {
+      player.hp = 1;
+      counters.lethalSaveUsed = true;
+      log.push(`${player.name}'s Paladin mastery refuses defeat!`);
+    }
+
     if (Number(player.hp || 0) <= 0) {
       status = "lost";
       log.push(`${player.name} is defeated and returns to the Guild Hall.`);
     }
+  } else {
+    log.push(`${enemy.name} cannot keep up this turn.`);
   }
 
   if (Number(player.guardTurns || 0) > 0) player.guardTurns -= 1;
   if (Number(player.evasionTurns || 0) > 0) player.evasionTurns -= 1;
+  if (Number(player.damageBuffTurns || 0) > 0) {
+    player.damageBuffTurns -= 1;
+    if (player.damageBuffTurns <= 0) player.damageBuffPct = 0;
+  }
+  if (Number(enemy.attackDebuffTurns || 0) > 0) {
+    enemy.attackDebuffTurns -= 1;
+    if (enemy.attackDebuffTurns <= 0) enemy.attackDebuffPct = 0;
+  }
 
   return {
     ...battle,
@@ -2463,7 +2661,8 @@ async function resolveLocalBattleAction(kidId, battle, action, skillId = "") {
     player,
     enemy,
     companionUsed,
-    log: log.slice(-14),
+    counters,
+    log: log.slice(-16),
     rewards
   };
 }
