@@ -1266,31 +1266,65 @@ function getCurrentClassTitle(kid) {
   return def.name;
 }
 
-function radarChartSvg(stats) {
+function radarChartSvg(stats, comparisonStats = null) {
   const labels = ["STR", "WIS", "AGI", "KIND", "LUCK", "COUR"];
-  const values = STAT_KEYS.map(k => Number(stats[k] || 0));
-  const max = Math.max(20, ...values);
-  const cx = 150, cy = 145, radius = 100;
-  const point = (i, value) => {
-    const angle = -Math.PI / 2 + i * Math.PI * 2 / 6;
-    const r = radius * value / max;
+  const currentValues = STAT_KEYS.map(key => Number(stats?.[key] || 0));
+  const comparisonValues = comparisonStats ? STAT_KEYS.map(key => Number(comparisonStats?.[key] || 0)) : [];
+  const max = Math.max(20, ...currentValues, ...comparisonValues);
+  const cx = 150;
+  const cy = 145;
+  const radius = 96;
+
+  const point = (index, value) => {
+    const angle = -Math.PI / 2 + index * Math.PI * 2 / 6;
+    const r = radius * Math.max(0, value) / max;
     return `${(cx + Math.cos(angle) * r).toFixed(1)},${(cy + Math.sin(angle) * r).toFixed(1)}`;
   };
-  const outer = labels.map((_, i) => point(i, max)).join(" ");
-  const middle = labels.map((_, i) => point(i, max * .5)).join(" ");
-  const data = values.map((v, i) => point(i, v)).join(" ");
-  const axes = labels.map((label, i) => {
-    const angle = -Math.PI / 2 + i * Math.PI * 2 / 6;
-    const x = cx + Math.cos(angle) * 120;
-    const y = cy + Math.sin(angle) * 120;
-    return `<line x1="${cx}" y1="${cy}" x2="${cx + Math.cos(angle)*radius}" y2="${cy + Math.sin(angle)*radius}" stroke="rgba(255,255,255,.18)"/><text x="${x}" y="${y}" fill="currentColor" font-size="12" text-anchor="middle" dominant-baseline="middle">${label}</text>`;
+
+  const ring = fraction => labels.map((_, index) => point(index, max * fraction)).join(" ");
+  const currentPoints = currentValues.map((value, index) => point(index, value)).join(" ");
+  const comparisonPoints = comparisonValues.map((value, index) => point(index, value)).join(" ");
+
+  const axes = labels.map((label, index) => {
+    const angle = -Math.PI / 2 + index * Math.PI * 2 / 6;
+    const axisX = cx + Math.cos(angle) * radius;
+    const axisY = cy + Math.sin(angle) * radius;
+    const labelX = cx + Math.cos(angle) * 120;
+    const labelY = cy + Math.sin(angle) * 120;
+    return `
+      <line x1="${cx}" y1="${cy}" x2="${axisX}" y2="${axisY}" class="stat-radar-axis"/>
+      <text x="${labelX}" y="${labelY}" class="stat-radar-label" text-anchor="middle" dominant-baseline="middle">${label}</text>`;
   }).join("");
-  return `<svg viewBox="0 0 300 290" role="img" aria-label="Character stat radar chart" style="width:100%;max-width:380px;display:block;margin:auto;color:var(--text);">
-    <polygon points="${outer}" fill="none" stroke="rgba(255,255,255,.28)"/>
-    <polygon points="${middle}" fill="none" stroke="rgba(255,255,255,.12)"/>
-    ${axes}
-    <polygon points="${data}" fill="rgba(118,103,255,.34)" stroke="var(--primary)" stroke-width="3"/>
-  </svg>`;
+
+  return `
+    <svg class="stat-radar" viewBox="0 0 300 290" role="img" aria-label="Character attribute radar chart">
+      <polygon points="${ring(1)}" class="stat-radar-ring outer"/>
+      <polygon points="${ring(.75)}" class="stat-radar-ring"/>
+      <polygon points="${ring(.5)}" class="stat-radar-ring"/>
+      <polygon points="${ring(.25)}" class="stat-radar-ring"/>
+      ${axes}
+      <polygon points="${currentPoints}" class="stat-radar-shape current"/>
+      ${comparisonStats ? `<polygon points="${comparisonPoints}" class="stat-radar-shape proposed"/>` : ""}
+    </svg>`;
+}
+
+function statComparisonTableHtml(currentStats, proposedStats = null) {
+  return STAT_KEYS.map(key => {
+    const current = Number(currentStats?.[key] || 0);
+    const proposed = proposedStats ? Number(proposedStats?.[key] || 0) : current;
+    const delta = proposed - current;
+    const deltaClass = delta > 0 ? "positive" : delta < 0 ? "negative" : "neutral";
+    const deltaText = delta === 0 ? "" : `${delta > 0 ? "+" : ""}${delta}`;
+    return `
+      <div class="stat-number-row">
+        <span class="stat-number-name">${statAbbreviation(key)}</span>
+        <strong>${current}</strong>
+        ${proposedStats ? `
+          <span class="stat-number-arrow">→</span>
+          <strong class="${deltaClass}">${proposed}</strong>
+          <small class="${deltaClass}">${deltaText}</small>` : ""}
+      </div>`;
+  }).join("");
 }
 
 const EQUIPMENT_SLOT_ICONS = {
@@ -1442,10 +1476,17 @@ function renderClassScreen(kid) {
         </div>
       </section>
 
-      <section class="card jrpg-menu-card">
+      <section class="card jrpg-menu-card attribute-overview-card">
         <div class="jrpg-section-heading">
-          <div><h2>Attributes</h2><p>Current totals, including equipment.</p></div>
+          <div><h2>Attributes</h2><p>Level growth plus equipment bonuses.</p></div>
           <span>HP ${stats.hp}</span>
+        </div>
+        <div class="attribute-overview">
+          <div class="stat-radar-wrap">
+            ${radarChartSvg(stats)}
+            <div class="stat-radar-legend"><span class="current">Current build</span></div>
+          </div>
+          <div class="stat-number-list">${statComparisonTableHtml(stats)}</div>
         </div>
         <div class="jrpg-stat-grid">${statRows}</div>
       </section>
@@ -1482,69 +1523,107 @@ function renderClassScreen(kid) {
     const currentItem = equipped[slot] || null;
     const matchingItems = inventory.filter(item => item.slot === slot);
     const slotLabel = EQUIPMENT_SLOTS[slot] || slot;
+    let selectedItem = null;
 
-    chooserHost.innerHTML = `
-      <div class="jrpg-section-heading">
-        <div><h2>${escapeHtml(slotLabel)}</h2><p>${matchingItems.length} compatible item${matchingItems.length === 1 ? "" : "s"} available.</p></div>
-        <button id="closeEquipmentChooserBtn" class="equipment-close-btn" type="button">✕</button>
-      </div>
+    const renderChooser = () => {
+      let proposedStats = null;
+      if (selectedItem) {
+        const proposedEquipment = { ...equipped, [slot]: selectedItem };
+        proposedStats = getClassStats({ ...kid, equipment: proposedEquipment });
+      }
 
-      ${currentItem ? `
-        <div class="equipment-current-item">
-          <span class="equipment-slot-icon">${itemIcon(currentItem)}</span>
-          <div><small>Currently equipped</small><strong>${escapeHtml(displayItemName(currentItem))}</strong><span>${escapeHtml(formatBonuses(currentItem))}</span></div>
-          <button id="removeEquipmentBtn" type="button">Remove</button>
-        </div>` : '<p class="equipment-none-equipped">Nothing is currently equipped in this slot.</p>'}
+      chooserHost.innerHTML = `
+        <div class="jrpg-section-heading">
+          <div><h2>${escapeHtml(slotLabel)}</h2><p>${matchingItems.length} compatible item${matchingItems.length === 1 ? "" : "s"} available.</p></div>
+          <button id="closeEquipmentChooserBtn" class="equipment-close-btn" type="button">✕</button>
+        </div>
 
-      <div class="equipment-choice-list">
-        ${matchingItems.length ? matchingItems.map(item => {
-          const grade = ITEM_GRADES[item.grade] || ITEM_GRADES.wood;
-          return `
-            <button class="equipment-choice-row" type="button" data-item-id="${escapeAttribute(item.instanceId)}">
-              <span class="equipment-slot-icon" style="border-color:${grade.color};box-shadow:0 0 14px ${grade.glow};">${itemIcon(item)}</span>
-              <span class="equipment-choice-copy">
-                <strong>${escapeHtml(displayItemName(item))}</strong>
-                <small>${grade.name} • ${escapeHtml(formatBonuses(item))}</small>
-                <span class="equipment-delta-list">${equipmentComparisonHtml(item, currentItem)}</span>
-              </span>
-              <span class="equipment-choice-action">Equip</span>
-            </button>`;
-        }).join("") : '<div class="equipment-chooser-empty"><span>🎒</span><p>No compatible items are in the inventory yet.</p></div>'}
-      </div>`;
+        ${currentItem ? `
+          <div class="equipment-current-item">
+            <span class="equipment-slot-icon">${itemIcon(currentItem)}</span>
+            <div><small>Currently equipped</small><strong>${escapeHtml(displayItemName(currentItem))}</strong><span>${escapeHtml(formatBonuses(currentItem))}</span></div>
+            <button id="removeEquipmentBtn" type="button">Remove</button>
+          </div>` : '<p class="equipment-none-equipped">Nothing is currently equipped in this slot.</p>'}
 
-    document.querySelectorAll(".equipment-slot-row").forEach(row => {
-      row.classList.toggle("selected", row.dataset.equipmentSlot === slot);
-    });
+        <div class="equipment-preview-card ${selectedItem ? "active" : ""}">
+          <div class="equipment-preview-heading">
+            <div>
+              <small>${selectedItem ? "Previewing" : "Equipment comparison"}</small>
+              <strong>${selectedItem ? escapeHtml(displayItemName(selectedItem)) : "Choose an item below"}</strong>
+            </div>
+            ${selectedItem ? '<button id="confirmEquipBtn" type="button">Equip Selected</button>' : ""}
+          </div>
+          <div class="equipment-preview-grid">
+            <div class="stat-radar-wrap">
+              ${radarChartSvg(stats, proposedStats)}
+              <div class="stat-radar-legend">
+                <span class="current">Current</span>
+                ${selectedItem ? '<span class="proposed">With item</span>' : ""}
+              </div>
+            </div>
+            <div class="stat-number-list">
+              ${statComparisonTableHtml(stats, proposedStats)}
+            </div>
+          </div>
+        </div>
 
-    document.getElementById("closeEquipmentChooserBtn")?.addEventListener("click", () => {
-      chooserHost.innerHTML = '<div class="equipment-chooser-empty"><span>☝️</span><p>Select an equipment slot above.</p></div>';
-      document.querySelectorAll(".equipment-slot-row").forEach(row => row.classList.remove("selected"));
-    });
+        <div class="equipment-choice-list">
+          ${matchingItems.length ? matchingItems.map(item => {
+            const grade = ITEM_GRADES[item.grade] || ITEM_GRADES.wood;
+            const isSelected = selectedItem?.instanceId === item.instanceId;
+            return `
+              <button class="equipment-choice-row ${isSelected ? "selected" : ""}" type="button" data-item-id="${escapeAttribute(item.instanceId)}">
+                <span class="equipment-slot-icon" style="border-color:${grade.color};box-shadow:0 0 14px ${grade.glow};">${itemIcon(item)}</span>
+                <span class="equipment-choice-copy">
+                  <strong>${escapeHtml(displayItemName(item))}</strong>
+                  <small>${grade.name} • ${escapeHtml(formatBonuses(item))}</small>
+                  <span class="equipment-delta-list">${equipmentComparisonHtml(item, currentItem)}</span>
+                </span>
+                <span class="equipment-choice-action">${isSelected ? "Selected" : "Preview"}</span>
+              </button>`;
+          }).join("") : '<div class="equipment-chooser-empty"><span>🎒</span><p>No compatible items are in the inventory yet.</p></div>'}
+        </div>`;
 
-    document.getElementById("removeEquipmentBtn")?.addEventListener("click", async () => {
-      const nextEquipment = { ...equipped };
-      delete nextEquipment[slot];
-      await updateDoc(doc(db, "kids", kid.kidId), {
-        inventory: [...inventory, { ...currentItem, equipped: false }],
-        equipment: nextEquipment
+      document.querySelectorAll(".equipment-slot-row").forEach(row => {
+        row.classList.toggle("selected", row.dataset.equipmentSlot === slot);
       });
-      await loadClassScreen(kid.kidId);
-    });
 
-    document.querySelectorAll(".equipment-choice-row").forEach(button => button.addEventListener("click", async () => {
-      const item = inventory.find(entry => entry.instanceId === button.dataset.itemId);
-      if (!item) return;
-      const nextInventory = inventory.filter(entry => entry.instanceId !== item.instanceId);
-      const nextEquipment = { ...equipped };
-      if (nextEquipment[slot]) nextInventory.push({ ...nextEquipment[slot], equipped: false });
-      nextEquipment[slot] = { ...item, equipped: true };
-      await updateDoc(doc(db, "kids", kid.kidId), { inventory: nextInventory, equipment: nextEquipment });
-      await loadClassScreen(kid.kidId);
-    }));
+      document.getElementById("closeEquipmentChooserBtn")?.addEventListener("click", () => {
+        chooserHost.innerHTML = '<div class="equipment-chooser-empty"><span>☝️</span><p>Select an equipment slot above.</p></div>';
+        document.querySelectorAll(".equipment-slot-row").forEach(row => row.classList.remove("selected"));
+      });
 
+      document.getElementById("removeEquipmentBtn")?.addEventListener("click", async () => {
+        const nextEquipment = { ...equipped };
+        delete nextEquipment[slot];
+        await updateDoc(doc(db, "kids", kid.kidId), {
+          inventory: [...inventory, { ...currentItem, equipped: false }],
+          equipment: nextEquipment
+        });
+        await loadClassScreen(kid.kidId);
+      });
+
+      document.querySelectorAll(".equipment-choice-row").forEach(button => {
+        button.addEventListener("click", () => {
+          selectedItem = inventory.find(entry => entry.instanceId === button.dataset.itemId) || null;
+          renderChooser();
+        });
+      });
+
+      document.getElementById("confirmEquipBtn")?.addEventListener("click", async () => {
+        if (!selectedItem) return;
+        const nextInventory = inventory.filter(entry => entry.instanceId !== selectedItem.instanceId);
+        const nextEquipment = { ...equipped };
+        if (nextEquipment[slot]) nextInventory.push({ ...nextEquipment[slot], equipped: false });
+        nextEquipment[slot] = { ...selectedItem, equipped: true };
+        await updateDoc(doc(db, "kids", kid.kidId), { inventory: nextInventory, equipment: nextEquipment });
+        await loadClassScreen(kid.kidId);
+      });
+    };
+
+    renderChooser();
     chooserHost.scrollIntoView({ behavior: "smooth", block: "start" });
   };
-
   document.querySelectorAll(".equipment-slot-row").forEach(button => {
     button.addEventListener("click", () => openEquipmentChooser(button.dataset.equipmentSlot));
   });
