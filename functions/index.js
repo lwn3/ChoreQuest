@@ -375,3 +375,254 @@ exports.runAdventure = onCall({maxInstances: 3}, async (request) => {
 
   return result;
 });
+
+
+const BATTLE_ENEMIES = {
+  forest: [
+    {id: "slime", name: "Moss Slime", icon: "🟢", hp: 24, attack: 5, defense: 1},
+    {id: "goblin", name: "Trail Goblin", icon: "👺", hp: 30, attack: 6, defense: 2},
+  ],
+  ruins: [
+    {id: "skeleton", name: "Ruins Skeleton", icon: "💀", hp: 40, attack: 8, defense: 3},
+    {id: "beetle", name: "Stone Beetle", icon: "🪲", hp: 48, attack: 7, defense: 5},
+  ],
+  vault: [
+    {id: "wisp", name: "Arcane Wisp", icon: "🔵", hp: 58, attack: 10, defense: 5},
+    {id: "sentinel", name: "Vault Sentinel", icon: "🗿", hp: 72, attack: 11, defense: 7},
+  ],
+};
+
+const BATTLE_SKILLS = {
+  warrior: {id: "power_strike", name: "Power Strike", cost: 3, kind: "physical", multiplier: 1.8},
+  rogue: {id: "flurry", name: "Flurry", cost: 3, kind: "physical", multiplier: 1.65},
+  mage: {id: "arc_bolt", name: "Arc Bolt", cost: 3, kind: "magic", multiplier: 1.85},
+  ranger: {id: "piercing_shot", name: "Piercing Shot", cost: 3, kind: "physical", multiplier: 1.75},
+  guardian: {id: "shield_bash", name: "Shield Bash", cost: 3, kind: "physical", multiplier: 1.55},
+  royal: {id: "radiant_burst", name: "Radiant Burst", cost: 3, kind: "magic", multiplier: 1.75},
+};
+
+function battlePlayerProfile(kid) {
+  const stats = calculateCombatStats(kid);
+  const level = Math.max(1, Number(kid.level || 1));
+  const maxHp = 30 + level * 3 + Math.round(stats.courage * 3.5);
+  const maxSp = Math.min(30, 5 + Math.floor(level / 2) + Math.floor(stats.wisdom / 3));
+  const magicBasic = stats.wisdom > stats.strength;
+  const skill = BATTLE_SKILLS[kid.classId] || BATTLE_SKILLS.warrior;
+  return {stats, level, maxHp, maxSp, magicBasic, skill};
+}
+
+function scaledEnemy(adventureId, level) {
+  const options = BATTLE_ENEMIES[adventureId] || BATTLE_ENEMIES.forest;
+  const base = options[Math.floor(Math.random() * options.length)];
+  const levelOffset = Math.max(0, level - 1);
+  return {
+    ...base,
+    maxHp: Math.round(base.hp + levelOffset * 5.5),
+    attack: Math.round(base.attack + levelOffset * 0.75),
+    defense: Math.round(base.defense + levelOffset * 0.35),
+  };
+}
+
+function publicBattleState(data, sessionId) {
+  return {
+    sessionId,
+    status: data.status,
+    turn: Number(data.turn || 1),
+    player: {
+      name: data.playerName,
+      hp: Number(data.playerHp || 0),
+      maxHp: Number(data.playerMaxHp || 0),
+      sp: Number(data.playerSp || 0),
+      maxSp: Number(data.playerMaxSp || 0),
+      basicName: data.basicName,
+      skill: data.skill,
+    },
+    enemy: {
+      name: data.enemyName,
+      icon: data.enemyIcon,
+      hp: Number(data.enemyHp || 0),
+      maxHp: Number(data.enemyMaxHp || 0),
+    },
+    log: Array.isArray(data.log) ? data.log.slice(-8) : [],
+    rewards: data.rewards || null,
+  };
+}
+
+exports.startBattle = onCall({maxInstances: 3}, async (request) => {
+  const kidId = authorizedKidId(request);
+  const adventureId = String(request.data?.adventureId || "");
+  const adventure = ADVENTURES[adventureId];
+  if (!adventure) throw new HttpsError("invalid-argument", "Unknown adventure.");
+
+  const kidRef = db.collection("kids").doc(kidId);
+  const battleRef = db.collection("battleSessions").doc();
+  const today = chicagoDateKey();
+
+  const result = await db.runTransaction(async (transaction) => {
+    const kidSnap = await transaction.get(kidRef);
+    if (!kidSnap.exists) throw new HttpsError("not-found", "Adventurer not found.");
+
+    const kid = kidSnap.data();
+    const energy = Math.min(MAX_ENERGY, Number(kid.energy ?? MAX_ENERGY));
+    const sleepiness = kid.sleepinessDate === today ? Number(kid.sleepiness || 0) : 0;
+    if (energy < adventure.energy) {
+      throw new HttpsError("failed-precondition", "Not enough energy. Eat some quest food first.");
+    }
+    if (sleepiness + adventure.sleepiness > MAX_SLEEPINESS) {
+      throw new HttpsError("failed-precondition", "Too sleepy to adventure again today.");
+    }
+
+    const profile = battlePlayerProfile(kid);
+    const enemy = scaledEnemy(adventureId, profile.level);
+    const data = {
+      kidId,
+      adventureId,
+      status: "active",
+      turn: 1,
+      playerName: kid.name || kidId,
+      playerHp: profile.maxHp,
+      playerMaxHp: profile.maxHp,
+      playerSp: profile.maxSp,
+      playerMaxSp: profile.maxSp,
+      playerStats: profile.stats,
+      basicName: profile.magicBasic ? "Spark" : "Attack",
+      basicKind: profile.magicBasic ? "magic" : "physical",
+      skill: profile.skill,
+      enemyName: enemy.name,
+      enemyIcon: enemy.icon,
+      enemyHp: enemy.maxHp,
+      enemyMaxHp: enemy.maxHp,
+      enemyAttack: enemy.attack,
+      enemyDefense: enemy.defense,
+      guarding: false,
+      rewards: null,
+      log: [`${kid.name || kidId} encountered ${enemy.name}!`],
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
+    transaction.update(kidRef, {
+      energy: energy - adventure.energy,
+      sleepiness: sleepiness + adventure.sleepiness,
+      sleepinessDate: today,
+      lastAdventureAt: FieldValue.serverTimestamp(),
+    });
+    transaction.create(battleRef, data);
+    return publicBattleState(data, battleRef.id);
+  });
+
+  return result;
+});
+
+exports.battleAction = onCall({maxInstances: 3}, async (request) => {
+  const kidId = authorizedKidId(request);
+  const sessionId = String(request.data?.sessionId || "");
+  const action = String(request.data?.action || "");
+  if (!sessionId) throw new HttpsError("invalid-argument", "Battle session required.");
+  if (!["basic", "skill", "defend"].includes(action)) {
+    throw new HttpsError("invalid-argument", "Unknown battle action.");
+  }
+
+  const battleRef = db.collection("battleSessions").doc(sessionId);
+  const kidRef = db.collection("kids").doc(kidId);
+
+  const result = await db.runTransaction(async (transaction) => {
+    const [battleSnap, kidSnap] = await Promise.all([
+      transaction.get(battleRef),
+      transaction.get(kidRef),
+    ]);
+    if (!battleSnap.exists) throw new HttpsError("not-found", "Battle not found.");
+    if (!kidSnap.exists) throw new HttpsError("not-found", "Adventurer not found.");
+
+    const battle = battleSnap.data();
+    if (battle.kidId !== kidId) throw new HttpsError("permission-denied", "That is not your battle.");
+    if (battle.status !== "active") return publicBattleState(battle, sessionId);
+
+    const stats = battle.playerStats || {};
+    let playerHp = Number(battle.playerHp || 0);
+    let playerSp = Number(battle.playerSp || 0);
+    let enemyHp = Number(battle.enemyHp || 0);
+    let guarding = false;
+    const log = Array.isArray(battle.log) ? [...battle.log] : [];
+    const luck = Number(stats.luck || 0);
+    const critChance = Math.min(0.28, 0.04 + luck * 0.006);
+    const crit = Math.random() < critChance;
+
+    if (action === "defend") {
+      guarding = true;
+      playerSp = Math.min(Number(battle.playerMaxSp || 0), playerSp + 1);
+      log.push(`${battle.playerName} defends and recovers 1 SP.`);
+    } else {
+      const isSkill = action === "skill";
+      const skill = battle.skill || BATTLE_SKILLS.warrior;
+      if (isSkill && playerSp < Number(skill.cost || 0)) {
+        throw new HttpsError("failed-precondition", "Not enough SP.");
+      }
+
+      const kind = isSkill ? skill.kind : battle.basicKind;
+      const statValue = kind === "magic" ? Number(stats.wisdom || 0) : Number(stats.strength || 0);
+      const multiplier = isSkill ? Number(skill.multiplier || 1.5) : 1;
+      const defense = Number(battle.enemyDefense || 0);
+      const variance = 0.9 + Math.random() * 0.2;
+      let damage = Math.max(1, Math.round((statValue * multiplier + Number(stats.agility || 0) * 0.15) * variance - defense));
+      if (crit) damage = Math.round(damage * 1.6);
+      enemyHp = Math.max(0, enemyHp - damage);
+      if (isSkill) playerSp -= Number(skill.cost || 0);
+      const actionName = isSkill ? skill.name : battle.basicName;
+      log.push(`${battle.playerName} uses ${actionName} for ${damage} damage${crit ? " — critical hit!" : "!"}`);
+    }
+
+    let status = "active";
+    let rewards = null;
+
+    if (enemyHp <= 0) {
+      status = "won";
+      const adventure = ADVENTURES[battle.adventureId] || ADVENTURES.forest;
+      const rewardRoll = 0.9 + Math.random() * 0.2;
+      const xp = Math.max(1, Math.round(adventure.xp * rewardRoll));
+      const gold = Math.max(1, Math.round(adventure.gold * rewardRoll));
+      const kid = kidSnap.data();
+      const newXp = Number(kid.xp || 0) + xp;
+      const newLevel = Math.floor(newXp / 100) + 1;
+      rewards = {xp, gold, level: newLevel};
+      transaction.update(kidRef, {
+        xp: newXp,
+        gold: Number(kid.gold || 0) + gold,
+        level: newLevel,
+      });
+      log.push(`${battle.enemyName} is defeated! +${xp} XP, +${gold} Gold.`);
+    } else {
+      const dodgeChance = Math.min(0.25, Number(stats.agility || 0) * 0.006);
+      if (Math.random() < dodgeChance) {
+        log.push(`${battle.playerName} dodges ${battle.enemyName}'s attack!`);
+      } else {
+        const courageReduction = Math.floor(Number(stats.courage || 0) * 0.16);
+        let enemyDamage = Math.max(1, Math.round(Number(battle.enemyAttack || 1) * (0.9 + Math.random() * 0.2)) - courageReduction);
+        if (guarding) enemyDamage = Math.max(1, Math.ceil(enemyDamage / 2));
+        playerHp = Math.max(0, playerHp - enemyDamage);
+        log.push(`${battle.enemyName} hits for ${enemyDamage} damage${guarding ? " through your guard." : "."}`);
+      }
+
+      if (playerHp <= 0) {
+        status = "lost";
+        log.push(`${battle.playerName} is defeated and returns to the Guild Hall.`);
+      }
+    }
+
+    const patch = {
+      status,
+      turn: Number(battle.turn || 1) + 1,
+      playerHp,
+      playerSp,
+      enemyHp,
+      guarding: false,
+      log: log.slice(-12),
+      rewards,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    transaction.update(battleRef, patch);
+    return publicBattleState({...battle, ...patch}, sessionId);
+  });
+
+  return result;
+});
