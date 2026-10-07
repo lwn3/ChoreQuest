@@ -1,9 +1,11 @@
+/* eslint-disable max-len, require-jsdoc */
 "use strict";
 
-const admin = require("firebase-admin");
+const {initializeApp} = require("firebase-admin/app");
+const {getFirestore, FieldValue} = require("firebase-admin/firestore");
 
-admin.initializeApp({projectId: "chorequest-3a721"});
-const db = admin.firestore();
+initializeApp({projectId: "chorequest-3a721"});
+const db = getFirestore();
 
 async function main() {
   const markerRef = db.collection("systemMigrations").doc("classTreeV2Reset");
@@ -17,7 +19,7 @@ async function main() {
   const kidsSnap = await db.collection("kids").get();
   const batch = db.batch();
 
-  kidsSnap.forEach(kidDoc => {
+  kidsSnap.forEach((kidDoc) => {
     batch.update(kidDoc.ref, {
       classId: "noob",
       classTitle: "Noob",
@@ -41,21 +43,21 @@ async function main() {
       sleepiness: 0,
       sleepinessDate: "",
       rebirths: 0,
-      lastAdventureAt: admin.firestore.FieldValue.delete()
+      lastAdventureAt: FieldValue.delete(),
     });
   });
 
   batch.set(markerRef, {
-    completedAt: admin.firestore.FieldValue.serverTimestamp(),
+    completedAt: FieldValue.serverTimestamp(),
     resetKidCount: kidsSnap.size,
-    version: 2
+    version: 2,
   });
 
   await batch.commit();
   console.log(`Class Tree V2 reset completed for ${kidsSnap.size} kid profiles.`);
 }
 
-main().catch(error => {
+main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
