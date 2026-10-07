@@ -2694,9 +2694,15 @@ async function approveSubmissionCore(submissionId) {
     if (!subSnap.exists()) return false;
     const submission = { submissionId, ...subSnap.data() };
     if (submission.status !== "Pending") return false;
-    const questSnap = await getDoc(doc(db, "quests", submission.questId));
+
+    const [questSnap, allQuestSnap, history] = await Promise.all([
+      getDoc(doc(db, "quests", submission.questId)),
+      getDocs(collection(db, "quests")),
+      getAllHistory()
+    ]);
+
     if (!questSnap.exists()) throw new Error("Quest not found for " + (submission.questName || submissionId));
-    const quest = questSnap.data();
+    const quest = { choreId: submission.questId, ...questSnap.data() };
     const participants = Array.from(new Set(submission.participantIds || [submission.submittedBy]));
     const isFullReward = quest.kidId !== ANYONE_ID && participants.includes(quest.kidId) && submission.submittedBy === quest.kidId;
     const rewardPoolXp = 0;
@@ -2704,52 +2710,105 @@ async function approveSubmissionCore(submissionId) {
     const xpShares = participants.map(() => 0);
     const goldShares = participants.map(() => 0);
     const foodRewards = [];
+    const approvedAt = new Date().toISOString();
+    const questDate = submission.questDate || getTodayKey();
+    const periodDate = dateFromKey(questDate);
 
-    for (let i = 0; i < participants.length; i++) {
-      const kidRef = doc(db, "kids", participants[i]);
-      const kidSnap = await getDoc(kidRef);
-      if (!kidSnap.exists()) continue;
-      const kid = { kidId: participants[i], ...kidSnap.data() };
-      const fullFoodReward = isFullReward && participants[i] === quest.kidId;
-      const foodId = questFoodRewardId(kid, quest, fullFoodReward);
-      const food = foodCatalogForKid(kid)[foodId];
-      const foodInventory = kid.foodInventory && typeof kid.foodInventory === "object" ? { ...kid.foodInventory } : {};
-      foodInventory[foodId] = Number(foodInventory[foodId] || 0) + 1;
+    const allQuests = [];
+    allQuestSnap.forEach(item => allQuests.push({ choreId: item.id, ...item.data() }));
 
-      await updateDoc(kidRef, {
-        foodInventory,
-        lifetimeQuests: Number(kid.lifetimeQuests || 0) + 1
-      });
+    const isSubtask = Boolean(quest.parentQuestId);
+    let rewardQuests = [];
 
-      foodRewards.push({
-        kidId: participants[i],
-        foodId,
-        foodName: food?.name || foodId,
-        energy: Number(food?.energy || 0)
-      });
+    if (!isSubtask) {
+      const dueDescendants = scheduledDescendantsForQuest(quest.choreId, allQuests, periodDate);
+      const incompleteDescendants = dueDescendants.filter(child =>
+        !isQuestCompletedForCurrentPeriod(child, history, periodDate)
+      );
+      if (incompleteDescendants.length) {
+        throw new Error("All due subtasks must be approved before the parent task can be approved.");
+      }
+      rewardQuests = [quest, ...dueDescendants];
     }
 
-    const approvedAt = new Date().toISOString();
-    await updateDoc(subRef, { status: "Approved", approvedAt, rewardPoolXp, rewardPoolGold, xpShares, goldShares });
+    if (rewardQuests.length) {
+      for (let i = 0; i < participants.length; i++) {
+        const kidRef = doc(db, "kids", participants[i]);
+        const kidSnap = await getDoc(kidRef);
+        if (!kidSnap.exists()) continue;
+        const kid = { kidId: participants[i], ...kidSnap.data() };
+        const foodInventory = kid.foodInventory && typeof kid.foodInventory === "object" ? { ...kid.foodInventory } : {};
+
+        rewardQuests.forEach(rewardQuest => {
+          const fullFoodReward = isFullReward && participants[i] === quest.kidId;
+          const foodId = questFoodRewardId(kid, rewardQuest, fullFoodReward);
+          const food = foodCatalogForKid(kid)[foodId];
+          foodInventory[foodId] = Number(foodInventory[foodId] || 0) + 1;
+          foodRewards.push({
+            kidId: participants[i],
+            questId: rewardQuest.choreId,
+            foodId,
+            foodName: food?.name || foodId,
+            energy: Number(food?.energy || 0)
+          });
+        });
+
+        await updateDoc(kidRef, {
+          foodInventory,
+          lifetimeQuests: Number(kid.lifetimeQuests || 0) + rewardQuests.length
+        });
+      }
+    }
+
+    await updateDoc(subRef, {
+      status: "Approved",
+      approvedAt,
+      rewardPoolXp,
+      rewardPoolGold,
+      xpShares,
+      goldShares,
+      rewardDeferredToParent: isSubtask,
+      bundledRewardQuestIds: rewardQuests.map(item => item.choreId)
+    });
+
     await addDoc(collection(db, "questHistory"), {
-      questId: submission.questId, questName: submission.questName || quest.name || "Quest",
-      assignedKidId: quest.kidId || ANYONE_ID, submittedBy: submission.submittedBy,
-      participantIds: participants, questDate: submission.questDate || getTodayKey(),
-      periodKey: submission.periodKey || getQuestPeriodKey({ ...quest, choreId: submission.questId }),
+      questId: submission.questId,
+      questName: submission.questName || quest.name || "Quest",
+      assignedKidId: quest.kidId || ANYONE_ID,
+      submittedBy: submission.submittedBy,
+      participantIds: participants,
+      questDate,
+      periodKey: submission.periodKey || getQuestPeriodKey(quest, periodDate),
       scheduleType: submission.scheduleType || getQuestScheduleType(quest),
-      approvedAt, rewardPoolXp, rewardPoolGold, xpShares, goldShares, foodRewards,
+      approvedAt,
+      rewardPoolXp,
+      rewardPoolGold,
+      xpShares,
+      goldShares,
+      foodRewards,
+      rewardDeferredToParent: isSubtask,
+      bundledRewardQuestIds: rewardQuests.map(item => item.choreId),
       isSideQuest: !isFullReward
     });
 
     const todaySubs = await getTodaySubmissions();
-    await Promise.all(todaySubs.filter(s => s.questId === submission.questId && s.submissionId !== submissionId && s.status === "Pending")
-      .map(s => updateDoc(doc(db, "questSubmissions", s.submissionId), { status: "Rejected", rejectedAt: approvedAt, rejectionReason: "Completed by another group" })));
+    await Promise.all(todaySubs.filter(s =>
+      s.questId === submission.questId &&
+      s.submissionId !== submissionId &&
+      s.status === "Pending"
+    ).map(s => updateDoc(doc(db, "questSubmissions", s.submissionId), {
+      status: "Rejected",
+      rejectedAt: approvedAt,
+      rejectionReason: "Completed by another group"
+    })));
+
     await updateDoc(doc(db, "quests", submission.questId), {
       status: "Approved",
       completedBy: submission.submittedBy,
       approvedAt,
       active: getQuestScheduleType(quest) === "one-time" ? false : quest.active !== false
     });
+
     await refreshAllStreaks();
     return true;
   } catch (err) {
