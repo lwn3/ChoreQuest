@@ -1739,8 +1739,10 @@ function renderClassScreen(kid) {
   const stats = getClassStats(kid);
   const baseStats = getBaseClassStats(kid);
   const title = getCurrentClassTitle(kid);
-  const unlocked = def.abilities.filter(a => level >= a.level);
-  const locked = def.abilities.filter(a => level < a.level);
+  const combatProgression = classCombatProgression(kid.classId);
+  const unlocked = combatProgression.skills.filter(a => level >= a.level);
+  const locked = combatProgression.skills.filter(a => level < a.level);
+  const perkCards = classPerkCards(kid);
   const equipped = kid.equipment && typeof kid.equipment === "object" ? kid.equipment : {};
   const equippedGearCount = Object.keys(EQUIPMENT_SLOTS).filter(slot => equipped[slot]).length;
   const inventory = Array.isArray(kid.inventory) ? kid.inventory : [];
@@ -1832,9 +1834,29 @@ function renderClassScreen(kid) {
         <div class="jrpg-stat-grid">${statRows}</div>
       </section>
 
-      <section class="card"><h2>Abilities & Spells</h2>
-        ${unlocked.map(a => `<div class="quest"><div class="quest-icon">✨</div><div class="quest-info"><strong>${escapeHtml(a.name)}</strong><span>Unlocked at Level ${a.level}</span><small class="status status-approved">${escapeHtml(a.text)}</small></div></div>`).join("")}
-        ${locked.map(a => `<div class="quest"><div class="quest-icon">🔒</div><div class="quest-info"><strong>${escapeHtml(a.name)}</strong><span>Unlocks at Level ${a.level}</span></div></div>`).join("")}
+      <section class="card class-ability-card">
+        <div class="jrpg-section-heading">
+          <div><h2>Abilities & Perks</h2><p>Your class grows into a different battle style as you level.</p></div>
+        </div>
+        <div class="class-perk-list">
+          ${perkCards.map(perk => `
+            <div class="class-perk-row">
+              <span>◆</span>
+              <div><small>${escapeHtml(perk.source)}</small><strong>${escapeHtml(perk.name)}</strong><p>${escapeHtml(perk.text)}</p></div>
+            </div>`).join("")}
+        </div>
+        <div class="class-skill-list">
+          ${unlocked.map(a => `
+            <div class="class-skill-row unlocked">
+              <span class="class-skill-icon">${a.icon || "✨"}</span>
+              <div><strong>${escapeHtml(a.name)}</strong><span>Level ${a.level} • ${Number(a.cost || 0)} SP</span><small>${escapeHtml(a.text)}</small></div>
+            </div>`).join("")}
+          ${locked.map(a => `
+            <div class="class-skill-row locked">
+              <span class="class-skill-icon">🔒</span>
+              <div><strong>${escapeHtml(a.name)}</strong><span>Unlocks at Level ${a.level}</span><small>${escapeHtml(a.text)}</small></div>
+            </div>`).join("")}
+        </div>
       </section>
 
       <section class="card jrpg-menu-card">
@@ -2756,15 +2778,17 @@ async function renderBattleScreen(kidId, battle) {
   setAppTheme("kid");
   try {
     const kidSnap = await getDoc(doc(db, "kids", kidId));
-    const kid = kidSnap.exists() ? { kidId, ...kidSnap.data() } : { kidId, name: battle?.player?.name || kidId, avatar: "⚔️" };
+    const kid = kidSnap.exists() ? {kidId, ...kidSnap.data()} : {kidId, name: battle?.player?.name || kidId, avatar: "⚔️"};
     const player = battle?.player || {};
     const enemy = battle?.enemy || {};
+    const skills = Array.isArray(player.skills) ? player.skills : [];
+    const companions = Array.isArray(battle.companions) ? battle.companions : [];
     const playerHpPct = player.maxHp ? Math.max(0, Math.min(100, Math.round(Number(player.hp || 0) / Number(player.maxHp) * 100))) : 0;
     const enemyHpPct = enemy.maxHp ? Math.max(0, Math.min(100, Math.round(Number(enemy.hp || 0) / Number(enemy.maxHp) * 100))) : 0;
     const spPct = player.maxSp ? Math.max(0, Math.min(100, Math.round(Number(player.sp || 0) / Number(player.maxSp) * 100))) : 0;
     const finished = battle.status === "won" || battle.status === "lost";
     const won = battle.status === "won";
-    const skill = player.skill || { name: "Special Move", cost: 3 };
+    const rewardDrop = battle.rewards?.drop || null;
 
     document.body.innerHTML = `
       <main class="app battle-app">
@@ -2773,14 +2797,18 @@ async function renderBattleScreen(kidId, battle) {
           <h1>Battle</h1>
           <p>Turn ${Number(battle.turn || 1)}</p>
         </header>
+
         <section class="battle-stage">
           <article class="battle-fighter enemy">
             <div class="battle-enemy-art">${escapeHtml(enemy.icon || "👾")}</div>
             <strong>${escapeHtml(enemy.name || "Monster")}</strong>
+            ${enemy.trait ? `<span class="battle-trait">${escapeHtml(enemy.trait)}</span>` : ""}
             <div class="battle-meter"><div class="battle-meter-fill hp" style="width:${enemyHpPct}%"></div></div>
             <small>HP ${Number(enemy.hp || 0)} / ${Number(enemy.maxHp || 0)}</small>
           </article>
+
           <div class="battle-versus">VS</div>
+
           <article class="battle-fighter player">
             <div class="battle-player-art">${renderCharacterThumbnail(kid)}</div>
             <strong>${escapeHtml(player.name || kid.name || kidId)}</strong>
@@ -2790,26 +2818,52 @@ async function renderBattleScreen(kidId, battle) {
             <small>SP ${Number(player.sp || 0)} / ${Number(player.maxSp || 0)}</small>
           </article>
         </section>
+
+        ${companions.length ? `
+          <section class="battle-companion-strip">
+            ${companions.map(companion => `<span title="${escapeAttribute(companion.effect || "")}">${escapeHtml(companion.icon)} ${escapeHtml(companion.name)}</span>`).join("")}
+          </section>` : ""}
+
         <section class="card battle-log-card">
           <h2>Battle Log</h2>
-          <div class="battle-log">${(battle.log || []).slice(-6).map(line => `<p>${escapeHtml(line)}</p>`).join("")}</div>
+          <div class="battle-log">${(battle.log || []).slice(-7).map(line => `<p>${escapeHtml(line)}</p>`).join("")}</div>
         </section>
+
         ${finished ? `
           <section class="card battle-result-card ${won ? "victory" : "defeat"}">
             <h2>${won ? "🏆 Victory!" : "💤 Defeated"}</h2>
             ${won && battle.rewards ? `
-              <p>+<strong>${Number(battle.rewards.xp || 0)} XP</strong> • +<strong>${Number(battle.rewards.gold || 0)} Gold</strong></p>
-              <small>Level ${Number(battle.rewards.level || kid.level || 1)}</small>
+              <div class="battle-reward-grid">
+                <div><span>XP</span><strong>+${Number(battle.rewards.xp || 0)}</strong></div>
+                <div><span>Gold</span><strong>+${Number(battle.rewards.gold || 0)}</strong></div>
+                <div><span>Level</span><strong>${Number(battle.rewards.level || kid.level || 1)}</strong></div>
+              </div>
+              ${battle.rewards.levelUp ? '<div class="level-up-banner">⬆️ Level Up!</div>' : ""}
+              ${rewardDrop ? `
+                <div class="battle-loot-drop">
+                  <span class="equipment-slot-icon">${itemIcon(rewardDrop)}</span>
+                  <div><small>Equipment found</small><strong>${escapeHtml(displayItemName(rewardDrop))}</strong><span>${escapeHtml(formatBonuses(rewardDrop))}</span></div>
+                </div>` : '<p class="battle-no-drop">No equipment dropped this time.</p>'}
             ` : '<p>You return safely, but this adventure gives no battle rewards.</p>'}
             <button id="battleContinueBtn" type="button">Continue Adventure</button>
           </section>
         ` : `
           <section class="battle-actions">
-            <button class="battle-action-btn basic" type="button" data-battle-action="basic"><span>⚔️</span><strong>${escapeHtml(player.basicName || "Attack")}</strong><small>Free basic action</small></button>
-            <button class="battle-action-btn skill" type="button" data-battle-action="skill" ${Number(player.sp || 0) < Number(skill.cost || 0) ? "disabled" : ""}><span>✨</span><strong>${escapeHtml(skill.name || "Special Move")}</strong><small>${Number(skill.cost || 0)} SP</small></button>
-            <button class="battle-action-btn defend" type="button" data-battle-action="defend"><span>🛡️</span><strong>Defend</strong><small>Half damage • +1 SP</small></button>
+            <button class="battle-action-btn basic" type="button" data-battle-action="basic">
+              <span>⚔️</span><strong>${escapeHtml(player.basicName || "Attack")}</strong><small>Free basic action</small>
+            </button>
+            <button class="battle-action-btn defend" type="button" data-battle-action="defend">
+              <span>🛡️</span><strong>Defend</strong><small>Reduce damage • +1 SP</small>
+            </button>
+            ${skills.map(skill => `
+              <button class="battle-action-btn skill" type="button" data-battle-action="skill" data-skill-id="${escapeAttribute(skill.id)}" ${Number(player.sp || 0) < Number(skill.cost || 0) ? "disabled" : ""}>
+                <span>${skill.icon || "✨"}</span>
+                <strong>${escapeHtml(skill.name)}</strong>
+                <small>${Number(skill.cost || 0)} SP • ${escapeHtml(skill.text || "")}</small>
+              </button>`).join("")}
           </section>
         `}
+
         <button id="battleRetreatBtn" type="button" class="battle-retreat-btn">${finished ? "← Back to Adventures" : "Retreat from Battle"}</button>
       </main>`;
 
@@ -2817,7 +2871,12 @@ async function renderBattleScreen(kidId, battle) {
       button.addEventListener("click", async () => {
         document.querySelectorAll(".battle-action-btn").forEach(item => { item.disabled = true; });
         try {
-          const nextBattle = await resolveLocalBattleAction(kidId, battle, button.dataset.battleAction);
+          const nextBattle = await resolveLocalBattleAction(
+            kidId,
+            battle,
+            button.dataset.battleAction,
+            button.dataset.skillId || ""
+          );
           await renderBattleScreen(kidId, nextBattle);
         } catch (err) {
           alert(err?.message || "That battle action failed.");
@@ -2881,6 +2940,14 @@ async function loadModLab(user) {
   try {
     let kid = await ensureModProfile();
     kid = await ensureInventoryInitialized(kid);
+    if (!Array.isArray(kid.activeCompanions) || kid.activeCompanions.length === 0) {
+      const activeCompanions = [
+        {name: "Emberfox", icon: "🦊", effectId: "double_cast", abilityName: "Double Cast", abilityText: "Sometimes echoes a magic ability at reduced power."},
+        {name: "Iron Beetle", icon: "🪲", effectId: "shield_breaker", abilityName: "Shield Breaker", abilityText: "Your first SP attack in battle cuts through heavy defense."}
+      ];
+      await updateDoc(doc(db, "kids", MOD_PROFILE_ID), {activeCompanions});
+      kid = {...kid, activeCompanions};
+    }
     const stats = getClassStats(kid);
     const rarityOptions = Object.keys(ITEM_GRADES);
     const slotEditors = Object.entries(EQUIPMENT_SLOTS).filter(([slot]) => slot !== "companion").map(([slot, label]) => {
