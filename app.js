@@ -2534,7 +2534,7 @@ function renderParentDashboard(data, user) {
         }).join("")}
       </section>
 
-      ${isGuildMaster ? '<a class="character parent-link" href="?manager=true"><div class="avatar">📋</div><div><strong>Quest Manager</strong><span>View and manage blueprints</span></div></a>' : ''}
+      ${isGuildMaster ? '<a class="character parent-link" href="?manager=true"><div class="avatar">📋</div><div><strong>Task Manager</strong><span>Create repeating tasks and subtasks</span></div></a>' : ''}
       <a class="character parent-link" href="?family=true"><div class="avatar">👨‍👩‍👧‍👦</div><div><strong>Family Accounts</strong><span>Create profiles and set or reset PINs</span></div></a>
     </main>`;
 
