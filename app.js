@@ -2734,10 +2734,10 @@ async function renderBattleScreen(kidId, battle) {
   setAppTheme("kid");
   try {
     const kidSnap = await getDoc(doc(db, "kids", kidId));
-    const kid = kidSnap.exists() ? {kidId, ...kidSnap.data()} : {kidId, name: battle?.player?.name || kidId, avatar: "⚔️"};
+    const kid = kidSnap.exists() ? {kidId, ...kidSnap.data()} : {kidId, name:battle?.player?.name || kidId, avatar:"⚔️"};
     const player = battle?.player || {};
     const enemy = battle?.enemy || {};
-    const skills = Array.isArray(player.skills) ? player.skills : [];
+    const skillRows = Array.isArray(player.skillRows) ? player.skillRows : [];
     const companions = Array.isArray(battle.companions) ? battle.companions : [];
     const playerHpPct = player.maxHp ? Math.max(0, Math.min(100, Math.round(Number(player.hp || 0) / Number(player.maxHp) * 100))) : 0;
     const enemyHpPct = enemy.maxHp ? Math.max(0, Math.min(100, Math.round(Number(enemy.hp || 0) / Number(enemy.maxHp) * 100))) : 0;
@@ -2745,6 +2745,7 @@ async function renderBattleScreen(kidId, battle) {
     const finished = battle.status === "won" || battle.status === "lost";
     const won = battle.status === "won";
     const rewardDrop = battle.rewards?.drop || null;
+    const bonusDrop = battle.rewards?.bonusDrop || null;
 
     document.body.innerHTML = `
       <main class="app battle-app">
@@ -2782,7 +2783,7 @@ async function renderBattleScreen(kidId, battle) {
 
         <section class="card battle-log-card">
           <h2>Battle Log</h2>
-          <div class="battle-log">${(battle.log || []).slice(-7).map(line => `<p>${escapeHtml(line)}</p>`).join("")}</div>
+          <div class="battle-log">${(battle.log || []).slice(-8).map(line => `<p>${escapeHtml(line)}</p>`).join("")}</div>
         </section>
 
         ${finished ? `
@@ -2791,32 +2792,58 @@ async function renderBattleScreen(kidId, battle) {
             ${won && battle.rewards ? `
               <div class="battle-reward-grid">
                 <div><span>XP</span><strong>+${Number(battle.rewards.xp || 0)}</strong></div>
+                <div><span>Class XP</span><strong>+${Number(battle.rewards.classXp || 0)}</strong></div>
                 <div><span>Gold</span><strong>+${Number(battle.rewards.gold || 0)}</strong></div>
-                <div><span>Level</span><strong>${Number(battle.rewards.level || kid.level || 1)}</strong></div>
               </div>
-              ${battle.rewards.levelUp ? '<div class="level-up-banner">⬆️ Level Up!</div>' : ""}
+              <div class="battle-progression-summary">
+                <span>Character Lv ${Number(battle.rewards.level || kid.level || 1)}</span>
+                <span>${escapeHtml(battle.rewards.className || "Class")} Lv ${Number(battle.rewards.classLevel || 1)}</span>
+              </div>
+              ${battle.rewards.levelUp ? '<div class="level-up-banner">⬆️ Character Level Up!</div>' : ""}
+              ${battle.rewards.classLevelUp ? '<div class="level-up-banner">📘 Class Level Up!</div>' : ""}
+              ${battle.rewards.classMastered ? `<div class="mastery-banner">★ ${escapeHtml(battle.rewards.className || "Class")} Mastered! Its capstone is now permanently active.</div>` : ""}
+              ${Array.isArray(battle.rewards.newUnlocks) && battle.rewards.newUnlocks.length ? `<div class="class-unlock-banner">🔓 New class${battle.rewards.newUnlocks.length === 1 ? "" : "es"}: ${escapeHtml(battle.rewards.newUnlocks.join(", "))}</div>` : ""}
               ${rewardDrop ? `
                 <div class="battle-loot-drop">
                   <span class="equipment-slot-icon">${itemIcon(rewardDrop)}</span>
                   <div><small>Equipment found</small><strong>${escapeHtml(displayItemName(rewardDrop))}</strong><span>${escapeHtml(formatBonuses(rewardDrop))}</span></div>
                 </div>` : '<p class="battle-no-drop">No equipment dropped this time.</p>'}
+              ${bonusDrop ? `
+                <div class="battle-loot-drop bonus">
+                  <span class="equipment-slot-icon">${itemIcon(bonusDrop)}</span>
+                  <div><small>Bonus treasure</small><strong>${escapeHtml(displayItemName(bonusDrop))}</strong><span>${escapeHtml(formatBonuses(bonusDrop))}</span></div>
+                </div>` : ""}
             ` : '<p>You return safely, but this adventure gives no battle rewards.</p>'}
             <button id="battleContinueBtn" type="button">Continue Adventure</button>
           </section>
         ` : `
-          <section class="battle-actions">
+          <section class="battle-basic-actions">
             <button class="battle-action-btn basic" type="button" data-battle-action="basic">
               <span>⚔️</span><strong>${escapeHtml(player.basicName || "Attack")}</strong><small>Free basic action</small>
             </button>
             <button class="battle-action-btn defend" type="button" data-battle-action="defend">
-              <span>🛡️</span><strong>Defend</strong><small>Reduce damage • +1 SP</small>
+              <span>🛡️</span><strong>Defend</strong><small>Reduce damage • recover SP</small>
             </button>
-            ${skills.map(skill => `
-              <button class="battle-action-btn skill" type="button" data-battle-action="skill" data-skill-id="${escapeAttribute(skill.id)}" ${Number(player.sp || 0) < Number(skill.cost || 0) ? "disabled" : ""}>
-                <span>${skill.icon || "✨"}</span>
-                <strong>${escapeHtml(skill.name)}</strong>
-                <small>${Number(skill.cost || 0)} SP • ${escapeHtml(skill.text || "")}</small>
-              </button>`).join("")}
+          </section>
+
+          <section class="battle-class-skills">
+            ${skillRows.map((row,index) => `
+              <div class="battle-skill-row ${row.support ? "support" : "current"}">
+                <div class="battle-skill-row-heading">
+                  ${renderClassSprite(row.classId, "battle-class-sprite")}
+                  <div><small>${row.support ? `Support Class ${index}` : "Current Class"}</small><strong>${escapeHtml(row.className)} Lv ${Number(row.classLevel || 1)}</strong></div>
+                </div>
+                ${row.skills?.length ? `
+                  <div class="battle-skill-row-grid" style="--skill-count:${Math.min(3,row.skills.length)}">
+                    ${row.skills.map(skill => `
+                      <button class="battle-action-btn skill" type="button" data-battle-action="skill" data-skill-id="${escapeAttribute(skill.id)}" ${Number(player.sp || 0) < Number(skill.cost || 0) ? "disabled" : ""}>
+                        <span>${skill.icon || row.classIcon || "✨"}</span>
+                        <strong>${escapeHtml(skill.name)}</strong>
+                        <small>${Number(skill.cost || 0)} SP</small>
+                      </button>`).join("")}
+                  </div>`
+                  : '<p class="battle-no-skills">No active skills learned from this class yet.</p>'}
+              </div>`).join("")}
           </section>
         `}
 
