@@ -43,6 +43,8 @@ const loginChildCall = httpsCallable(functions, "loginChild");
 const setChildPinCall = httpsCallable(functions, "setChildPin");
 const consumeFoodCall = httpsCallable(functions, "consumeFood");
 const runAdventureCall = httpsCallable(functions, "runAdventure");
+const startBattleCall = httpsCallable(functions, "startBattle");
+const battleActionCall = httpsCallable(functions, "battleAction");
 
 async function getChildIdentity(user = auth.currentUser) {
   if (!user) return null;
@@ -199,47 +201,47 @@ function normalizeRarity(value) {
 
 const ITEM_TYPES = {
   // --- WOOD TIER: MAIN HAND ---
-  wooden_sword: { name: "Wooden Sword", slot: "main_hand", icon: "\ud83d\udde1\ufe0f", iconFile: "wooden_sword.webp", bonuses: { strength: 2 } },
-  stick: { name: "Stick", slot: "main_hand", icon: "\ud83e\udeb5", iconFile: "stick.webp", bonuses: { wisdom: 1, luck: 1 } },
-  branch: { name: "Branch", slot: "main_hand", icon: "\ud83c\udf3f", iconFile: "branch.webp", bonuses: { wisdom: 2 } },
-  wooden_bow: { name: "Wooden Bow", slot: "main_hand", icon: "\ud83c\udff9", iconFile: "wooden_bow.webp", bonuses: { agility: 2 } },
-  wooden_axe: { name: "Wooden Axe", slot: "main_hand", icon: "\ud83e\ude93", iconFile: "wooden_axe.webp", bonuses: { strength: 2, courage: 1 } },
+  wooden_sword: { name: "Sword", slot: "main_hand", icon: "\ud83d\udde1\ufe0f", iconFile: "wooden_sword.webp", bonuses: { strength: 2 } },
+  stick: { name: "Wand", slot: "main_hand", icon: "\ud83e\udeb5", iconFile: "stick.webp", bonuses: { wisdom: 1, luck: 1 } },
+  branch: { name: "Staff", slot: "main_hand", icon: "\ud83c\udf3f", iconFile: "branch.webp", bonuses: { wisdom: 2 } },
+  wooden_bow: { name: "Bow", slot: "main_hand", icon: "\ud83c\udff9", iconFile: "wooden_bow.webp", bonuses: { agility: 2 } },
+  wooden_axe: { name: "Axe", slot: "main_hand", icon: "\ud83e\ude93", iconFile: "wooden_axe.webp", bonuses: { strength: 2, courage: 1 } },
 
   // --- WOOD TIER: OFF HAND ---
-  wooden_shield: { name: "Wooden Shield", slot: "off_hand", icon: "\ud83d\udee1\ufe0f", iconFile: "wooden_shield.webp", bonuses: { strength: 1, courage: 1 } },
-  wooden_tome: { name: "Wooden Tome", slot: "off_hand", icon: "\ud83d\udcd6", iconFile: "wooden_tome.webp", bonuses: { wisdom: 2 } },
-  carved_rune_slate: { name: "Carved Rune Slate", slot: "off_hand", icon: "\ud83e\udea8", iconFile: "carved_rune_slate.webp", bonuses: { wisdom: 1, kindness: 1 } },
+  wooden_shield: { name: "Shield", slot: "off_hand", icon: "\ud83d\udee1\ufe0f", iconFile: "wooden_shield.webp", bonuses: { strength: 1, courage: 1 } },
+  wooden_tome: { name: "Spellbook", slot: "off_hand", icon: "\ud83d\udcd6", iconFile: "wooden_tome.webp", bonuses: { wisdom: 2 } },
+  carved_rune_slate: { name: "Magic Focus", slot: "off_hand", icon: "\ud83e\udea8", iconFile: "carved_rune_slate.webp", bonuses: { wisdom: 1, kindness: 1 } },
 
   // --- WOOD TIER: HEAD ---
-  bark_cap: { name: "Bark Cap", slot: "head", icon: "\ud83c\udf44", iconFile: "bark_cap.webp", bonuses: { courage: 1 } },
-  wooden_helmet: { name: "Wooden Helmet", slot: "head", icon: "\ud83e\ude96", iconFile: "wooden_helmet.webp", bonuses: { strength: 1, courage: 1 } },
-  wooden_circlet: { name: "Wooden Circlet", slot: "head", icon: "\u2b55", iconFile: "wooden_circlet.webp", bonuses: { wisdom: 1 } },
-  wooden_hat: { name: "Wooden Hat", slot: "head", icon: "\ud83c\udfa9", iconFile: "wooden_hat.webp", bonuses: { luck: 1 } },
-  wood_crown: { name: "Wood Crown", slot: "head", icon: "\ud83d\udc51", iconFile: "wood_crown.webp", bonuses: { courage: 1, luck: 1 } },
+  bark_cap: { name: "Cap", slot: "head", icon: "\ud83c\udf44", iconFile: "bark_cap.webp", bonuses: { courage: 1 } },
+  wooden_helmet: { name: "Helmet", slot: "head", icon: "\ud83e\ude96", iconFile: "wooden_helmet.webp", bonuses: { strength: 1, courage: 1 } },
+  wooden_circlet: { name: "Circlet", slot: "head", icon: "\u2b55", iconFile: "wooden_circlet.webp", bonuses: { wisdom: 1 } },
+  wooden_hat: { name: "Hat", slot: "head", icon: "\ud83c\udfa9", iconFile: "wooden_hat.webp", bonuses: { luck: 1 } },
+  wood_crown: { name: "Crown", slot: "head", icon: "\ud83d\udc51", iconFile: "wood_crown.webp", bonuses: { courage: 1, luck: 1 } },
 
   // --- WOOD TIER: BODY ---
-  wooden_tunic: { name: "Wooden Tunic", slot: "body", icon: "\ud83e\udd4b", iconFile: "wooden_tunic.webp", bonuses: { courage: 1, kindness: 1 } },
-  wooden_robes: { name: "Wooden Robes", slot: "body", icon: "\ud83d\udc58", iconFile: "wooden_robes.webp", bonuses: { wisdom: 2 } },
+  wooden_tunic: { name: "Tunic", slot: "body", icon: "\ud83e\udd4b", iconFile: "wooden_tunic.webp", bonuses: { courage: 1, kindness: 1 } },
+  wooden_robes: { name: "Robes", slot: "body", icon: "\ud83d\udc58", iconFile: "wooden_robes.webp", bonuses: { wisdom: 2 } },
 
   // --- WOOD TIER: FEET ---
-  wooden_boots: { name: "Wooden Boots", slot: "feet", icon: "\ud83d\udc62", iconFile: "wooden_boots.webp", bonuses: { strength: 1 } },
-  wooden_shoes: { name: "Wooden Shoes", slot: "feet", icon: "\ud83d\udc5e", iconFile: "wooden_shoes.webp", bonuses: { agility: 1 } },
-  wooden_slippers: { name: "Wooden Slippers", slot: "feet", icon: "\ud83e\udd7f", iconFile: "wooden_slippers.webp", bonuses: { luck: 1, agility: 1 } },
+  wooden_boots: { name: "Boots", slot: "feet", icon: "\ud83d\udc62", iconFile: "wooden_boots.webp", bonuses: { strength: 1 } },
+  wooden_shoes: { name: "Shoes", slot: "feet", icon: "\ud83d\udc5e", iconFile: "wooden_shoes.webp", bonuses: { agility: 1 } },
+  wooden_slippers: { name: "Slippers", slot: "feet", icon: "\ud83e\udd7f", iconFile: "wooden_slippers.webp", bonuses: { luck: 1, agility: 1 } },
 
   // --- WOOD TIER: CAPE ---
-  leaf_cape: { name: "Leaf Cape", slot: "cape", icon: "\ud83c\udf42", iconFile: "leaf_cape.webp", bonuses: { agility: 1, courage: 1 } },
-  moss_cloak: { name: "Moss Cloak", slot: "cape", icon: "\ud83c\udf3f", iconFile: "moss_cloak.webp", bonuses: { kindness: 1, wisdom: 1 } },
+  leaf_cape: { name: "Cape", slot: "cape", icon: "\ud83c\udf42", iconFile: "leaf_cape.webp", bonuses: { agility: 1, courage: 1 } },
+  moss_cloak: { name: "Cloak", slot: "cape", icon: "\ud83c\udf3f", iconFile: "moss_cloak.webp", bonuses: { kindness: 1, wisdom: 1 } },
 
   // --- WOOD TIER: ACCESSORY ---
-  wooden_pendant: { name: "Wooden Pendant", slot: "accessory", icon: "\ud83e\ude99", iconFile: "wooden_pendant.webp", bonuses: { luck: 1 } },
-  acorn_charm: { name: "Acorn Charm", slot: "accessory", icon: "\ud83c\udf30", iconFile: "acorn_charm.webp", bonuses: { luck: 2 } },
-  pinecone_amulet: { name: "Pinecone Amulet", slot: "accessory", icon: "\ud83c\udf32", iconFile: "pinecone_amulet.webp", bonuses: { kindness: 1, courage: 1 } },
+  wooden_pendant: { name: "Pendant", slot: "accessory", icon: "\ud83e\ude99", iconFile: "wooden_pendant.webp", bonuses: { luck: 1 } },
+  acorn_charm: { name: "Charm", slot: "accessory", icon: "\ud83c\udf30", iconFile: "acorn_charm.webp", bonuses: { luck: 2 } },
+  pinecone_amulet: { name: "Amulet", slot: "accessory", icon: "\ud83c\udf32", iconFile: "pinecone_amulet.webp", bonuses: { kindness: 1, courage: 1 } },
 
   // --- LEGACY TEST ITEMS ---
-  wooden_medallion: { name: "Wooden Medallion", slot: "accessory", icon: "🪙", iconFile: "wooden_pendant.webp", bonuses: { luck: 1 } },
-  acorn_pendant: { name: "Acorn Pendant", slot: "accessory", icon: "🌰", iconFile: "acorn_charm.webp", bonuses: { luck: 2 } },
-  twine_quiver: { name: "Twine Quiver", slot: "accessory", icon: "🧵", iconFile: "pinecone_amulet.webp", bonuses: { agility: 1 } },
-  willow_ring: { name: "Willow Ring", slot: "accessory", icon: "💍", iconFile: "wooden_pendant.webp", bonuses: { kindness: 2 } }
+  wooden_medallion: { name: "Medallion", slot: "accessory", icon: "🪙", iconFile: "wooden_pendant.webp", bonuses: { luck: 1 } },
+  acorn_pendant: { name: "Pendant", slot: "accessory", icon: "🌰", iconFile: "acorn_charm.webp", bonuses: { luck: 2 } },
+  twine_quiver: { name: "Quiver", slot: "accessory", icon: "🧵", iconFile: "pinecone_amulet.webp", bonuses: { agility: 1 } },
+  willow_ring: { name: "Ring", slot: "accessory", icon: "💍", iconFile: "wooden_pendant.webp", bonuses: { kindness: 2 } }
 };
 
 const INVENTORY_VERSION = 3;
@@ -1389,15 +1391,23 @@ function renderStartingClassSelection(kid) {
   document.getElementById("classBackBtn").addEventListener("click", () => loadKidDashboard(kid.kidId));
 }
 
-function getClassStats(kid) {
+function getBaseClassStats(kid) {
   const def = CLASS_DEFINITIONS[kid.classId];
   const level = Math.max(1, Number(kid.level || 1));
-  const gear = equipmentBonuses(kid.equipment || {});
   const stats = {};
   STAT_KEYS.forEach(key => {
-    stats[key] = Number(def.base[key] || 0) + Math.max(0, level - 1) * Number(def.growth[key] || 0) + Number(gear[key] || 0);
+    stats[key] = Number(def.base[key] || 0) + Math.max(0, level - 1) * Number(def.growth[key] || 0);
   });
   stats.hp = 20 + level * 5;
+  return stats;
+}
+
+function getClassStats(kid) {
+  const stats = getBaseClassStats(kid);
+  const gear = equipmentBonuses(kid.equipment || {});
+  STAT_KEYS.forEach(key => {
+    stats[key] += Number(gear[key] || 0);
+  });
   return stats;
 }
 
@@ -1489,7 +1499,6 @@ function displayItemName(item) {
   const definition = ITEM_TYPES[item.itemType];
   if (!definition) return item.name || "Unknown Item";
   const rarity = normalizeRarity(item.rarity || item.grade);
-  if (item.name) return item.name;
   return rarity === "common" ? definition.name : `${ITEM_GRADES[rarity].name} ${definition.name}`;
 }
 
@@ -1577,6 +1586,7 @@ function renderClassScreen(kid) {
   const def = CLASS_DEFINITIONS[kid.classId];
   const level = Math.max(1, Number(kid.level || 1));
   const stats = getClassStats(kid);
+  const baseStats = getBaseClassStats(kid);
   const title = getCurrentClassTitle(kid);
   const unlocked = def.abilities.filter(a => level >= a.level);
   const locked = def.abilities.filter(a => level < a.level);
@@ -1661,8 +1671,11 @@ function renderClassScreen(kid) {
         </div>
         <div class="attribute-overview">
           <div class="stat-radar-wrap">
-            ${radarChartSvg(stats)}
-            <div class="stat-radar-legend"><span class="current">Current build</span></div>
+            ${radarChartSvg(baseStats, stats)}
+            <div class="stat-radar-legend">
+              <span class="current">Base stats</span>
+              <span class="proposed">With gear</span>
+            </div>
           </div>
         </div>
         <div class="jrpg-stat-grid">${statRows}</div>
@@ -2043,14 +2056,8 @@ async function loadAdventureScreen(kidId) {
       button.addEventListener("click", async () => {
         button.disabled = true;
         try {
-          const result = await runAdventureCall({ kidId, adventureId: button.dataset.adventureId });
-          const data = result?.data || {};
-          if (data.won) {
-            alert(`Victory! +${Number(data.xp || 0)} XP and +${Number(data.gold || 0)} Gold.`);
-          } else {
-            alert("The enemy got the better of you this time. Rest, gear up, and try again.");
-          }
-          await loadAdventureScreen(kidId);
+          const result = await startBattleCall({ kidId, adventureId: button.dataset.adventureId });
+          await renderBattleScreen(kidId, result?.data || {});
         } catch (err) {
           alert(err?.message || "Adventure could not start.");
           button.disabled = false;
@@ -2060,6 +2067,110 @@ async function loadAdventureScreen(kidId) {
     document.getElementById("adventureBackBtn")?.addEventListener("click", () => loadKidDashboard(kidId));
   } catch (err) {
     showError("Could not load adventure: " + err.message);
+  }
+}
+
+async function renderBattleScreen(kidId, battle) {
+  try {
+    const kidSnap = await getDoc(doc(db, "kids", kidId));
+    const kid = kidSnap.exists() ? { kidId, ...kidSnap.data() } : { kidId, name: battle?.player?.name || kidId, avatar: "⚔️" };
+    const player = battle?.player || {};
+    const enemy = battle?.enemy || {};
+    const playerHpPct = player.maxHp ? Math.max(0, Math.min(100, Math.round(Number(player.hp || 0) / Number(player.maxHp) * 100))) : 0;
+    const enemyHpPct = enemy.maxHp ? Math.max(0, Math.min(100, Math.round(Number(enemy.hp || 0) / Number(enemy.maxHp) * 100))) : 0;
+    const spPct = player.maxSp ? Math.max(0, Math.min(100, Math.round(Number(player.sp || 0) / Number(player.maxSp) * 100))) : 0;
+    const finished = battle.status === "won" || battle.status === "lost";
+    const won = battle.status === "won";
+    const skill = player.skill || { name: "Special Move", cost: 3 };
+
+    document.body.innerHTML = `
+      <main class="app battle-app">
+        <header class="hero compact battle-hero">
+          <div class="logo">⚔️</div>
+          <h1>Battle</h1>
+          <p>Turn ${Number(battle.turn || 1)}</p>
+        </header>
+
+        <section class="battle-stage">
+          <article class="battle-fighter enemy">
+            <div class="battle-enemy-art">${escapeHtml(enemy.icon || "👾")}</div>
+            <strong>${escapeHtml(enemy.name || "Monster")}</strong>
+            <div class="battle-meter"><div class="battle-meter-fill hp" style="width:${enemyHpPct}%"></div></div>
+            <small>HP ${Number(enemy.hp || 0)} / ${Number(enemy.maxHp || 0)}</small>
+          </article>
+
+          <div class="battle-versus">VS</div>
+
+          <article class="battle-fighter player">
+            <div class="battle-player-art">${renderCharacterThumbnail(kid)}</div>
+            <strong>${escapeHtml(player.name || kid.name || kidId)}</strong>
+            <div class="battle-meter"><div class="battle-meter-fill hp" style="width:${playerHpPct}%"></div></div>
+            <small>HP ${Number(player.hp || 0)} / ${Number(player.maxHp || 0)}</small>
+            <div class="battle-meter sp"><div class="battle-meter-fill sp" style="width:${spPct}%"></div></div>
+            <small>SP ${Number(player.sp || 0)} / ${Number(player.maxSp || 0)}</small>
+          </article>
+        </section>
+
+        <section class="card battle-log-card">
+          <h2>Battle Log</h2>
+          <div class="battle-log">
+            ${(battle.log || []).slice(-6).map(line => `<p>${escapeHtml(line)}</p>`).join("")}
+          </div>
+        </section>
+
+        ${finished ? `
+          <section class="card battle-result-card ${won ? "victory" : "defeat"}">
+            <h2>${won ? "🏆 Victory!" : "💤 Defeated"}</h2>
+            ${won && battle.rewards ? `
+              <p>+<strong>${Number(battle.rewards.xp || 0)} XP</strong> • +<strong>${Number(battle.rewards.gold || 0)} Gold</strong></p>
+              <small>Level ${Number(battle.rewards.level || kid.level || 1)}</small>
+            ` : '<p>You return safely, but this adventure gives no battle rewards.</p>'}
+            <button id="battleContinueBtn" type="button">Continue Adventure</button>
+          </section>
+        ` : `
+          <section class="battle-actions">
+            <button class="battle-action-btn basic" type="button" data-battle-action="basic">
+              <span>⚔️</span>
+              <strong>${escapeHtml(player.basicName || "Attack")}</strong>
+              <small>Free basic action</small>
+            </button>
+            <button class="battle-action-btn skill" type="button" data-battle-action="skill" ${Number(player.sp || 0) < Number(skill.cost || 0) ? "disabled" : ""}>
+              <span>✨</span>
+              <strong>${escapeHtml(skill.name || "Special Move")}</strong>
+              <small>${Number(skill.cost || 0)} SP</small>
+            </button>
+            <button class="battle-action-btn defend" type="button" data-battle-action="defend">
+              <span>🛡️</span>
+              <strong>Defend</strong>
+              <small>Half damage • +1 SP</small>
+            </button>
+          </section>
+        `}
+
+        <button id="battleRetreatBtn" type="button" class="battle-retreat-btn">${finished ? "← Back to Adventures" : "Retreat from Battle"}</button>
+      </main>`;
+
+    document.querySelectorAll(".battle-action-btn").forEach(button => {
+      button.addEventListener("click", async () => {
+        document.querySelectorAll(".battle-action-btn").forEach(item => { item.disabled = true; });
+        try {
+          const result = await battleActionCall({
+            kidId,
+            sessionId: battle.sessionId,
+            action: button.dataset.battleAction
+          });
+          await renderBattleScreen(kidId, result?.data || {});
+        } catch (err) {
+          alert(err?.message || "That battle action failed.");
+          await renderBattleScreen(kidId, battle);
+        }
+      });
+    });
+
+    document.getElementById("battleContinueBtn")?.addEventListener("click", () => loadAdventureScreen(kidId));
+    document.getElementById("battleRetreatBtn")?.addEventListener("click", () => loadAdventureScreen(kidId));
+  } catch (err) {
+    showError("Could not render battle: " + err.message);
   }
 }
 
