@@ -43,8 +43,8 @@ const loginChildCall = httpsCallable(functions, "loginChild");
 const setChildPinCall = httpsCallable(functions, "setChildPin");
 const consumeFoodCall = httpsCallable(functions, "consumeFood");
 const runAdventureCall = httpsCallable(functions, "runAdventure");
-const startBattleCall = httpsCallable(functions, "startBattle");
-const battleActionCall = httpsCallable(functions, "battleAction");
+const startBattleCall = httpsCallable(functions, "startBattleV2");
+const battleActionCall = httpsCallable(functions, "battleActionV2");
 
 async function getChildIdentity(user = auth.currentUser) {
   if (!user) return null;
