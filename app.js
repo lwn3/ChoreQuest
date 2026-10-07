@@ -43,8 +43,8 @@ const loginChildCall = httpsCallable(functions, "loginChild");
 const setChildPinCall = httpsCallable(functions, "setChildPin");
 const consumeFoodCall = httpsCallable(functions, "consumeFood");
 const runAdventureCall = httpsCallable(functions, "runAdventure");
-const startBattleCall = httpsCallable(functions, "startBattleV2");
-const battleActionCall = httpsCallable(functions, "battleActionV2");
+const startBattleCall = httpsCallable(functions, "startBattleLegacy");
+const battleActionCall = httpsCallable(functions, "battleActionLegacy");
 
 async function getChildIdentity(user = auth.currentUser) {
   if (!user) return null;
@@ -71,22 +71,20 @@ async function userCanAccessKid(kidId) {
 
 
 const THEME_PREF_KEY = "chorequestTheme";
-const THEME_OPTIONS = ["day", "night", "auto"];
 
 function storedThemePreference() {
   const stored = localStorage.getItem(THEME_PREF_KEY);
-  return THEME_OPTIONS.includes(stored) ? stored : "auto";
+  return stored === "day" || stored === "night" ? stored : "";
 }
 
 function resolvedThemePreference() {
-  const preference = storedThemePreference();
-  if (preference !== "auto") return preference;
+  const stored = storedThemePreference();
+  if (stored) return stored;
   const hour = new Date().getHours();
   return hour >= 7 && hour < 19 ? "day" : "night";
 }
 
 function applyThemePreference() {
-  const preference = storedThemePreference();
   const resolved = resolvedThemePreference();
   document.body.classList.add("kid-theme");
   document.body.classList.toggle("day-theme", resolved === "day");
@@ -94,16 +92,12 @@ function applyThemePreference() {
 
   const control = document.getElementById("themeModeControl");
   if (control) {
-    control.dataset.selected = preference;
-    control.dataset.resolved = resolved;
+    const target = resolved === "day" ? "night" : "day";
+    control.dataset.current = resolved;
+    control.setAttribute("aria-label", `Switch to ${target} mode`);
+    control.setAttribute("title", `Switch to ${target} mode`);
     const icon = control.querySelector(".theme-knob-icon");
-    if (icon) icon.textContent = preference === "auto" ? "A" : resolved === "day" ? "☀️" : "🌙";
-    control.setAttribute(
-      "aria-label",
-      preference === "auto"
-        ? "Theme: Auto. Tap for manual mode; swipe for day or night."
-        : `Theme: ${resolved}. Tap for Auto; swipe for day or night.`
-    );
+    if (icon) icon.textContent = target === "day" ? "☀️" : "🌙";
   }
 }
 
@@ -114,33 +108,12 @@ function ensureThemeControls() {
   control.id = "themeModeControl";
   control.className = "theme-mode-control";
   control.type = "button";
-  control.innerHTML = '<span class="theme-knob-icon">A</span>';
+  control.innerHTML = '<span class="theme-knob-icon">🌙</span>';
   document.body.appendChild(control);
 
-  let startX = 0;
-  let startY = 0;
-
-  control.addEventListener("pointerdown", event => {
-    startX = event.clientX;
-    startY = event.clientY;
-    control.setPointerCapture?.(event.pointerId);
-  });
-
-  control.addEventListener("pointerup", event => {
-    const dx = event.clientX - startX;
-    const dy = event.clientY - startY;
-    const isSwipe = Math.abs(dx) > 26 && Math.abs(dx) > Math.abs(dy);
-
-    if (isSwipe) {
-      localStorage.setItem(THEME_PREF_KEY, dx < 0 ? "day" : "night");
-    } else {
-      const current = storedThemePreference();
-      localStorage.setItem(
-        THEME_PREF_KEY,
-        current === "auto" ? resolvedThemePreference() : "auto"
-      );
-    }
-
+  control.addEventListener("click", () => {
+    const current = resolvedThemePreference();
+    localStorage.setItem(THEME_PREF_KEY, current === "day" ? "night" : "day");
     applyThemePreference();
   });
 
