@@ -2887,6 +2887,93 @@ function loadNewKidForm(user, kids) {
    QUEST MANAGER
 ------------------------------------------------- */
 
+function renderQuestScheduleEditor(quest = {}, quests = [], editingQuestId = "") {
+  const scheduleType = getQuestScheduleType(quest);
+  const intervalDays = getQuestIntervalDays(quest);
+  const parentOptions = quests
+    .filter(item => item.questId !== editingQuestId && item.archived !== true)
+    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
+    .map(item => `<option value="${escapeAttribute(item.questId)}" ${quest.parentQuestId === item.questId ? "selected" : ""}>${escapeHtml(item.name || "Unnamed quest")}</option>`)
+    .join("");
+
+  return `
+    ${formField("Parent task", `
+      <select id="questParent">
+        <option value="">None — top-level task</option>
+        ${parentOptions}
+      </select>
+    `)}
+
+    ${formField("Repeat", `
+      <select id="questScheduleType">
+        <option value="interval" ${scheduleType === "interval" ? "selected" : ""}>Every N days</option>
+        <option value="weekdays" ${scheduleType === "weekdays" ? "selected" : ""}>Specific weekdays</option>
+        <option value="one-time" ${scheduleType === "one-time" ? "selected" : ""}>Does not repeat</option>
+      </select>
+    `)}
+
+    <div id="intervalOptions">
+      ${formField("Repeat every", `
+        <div class="repeat-inline">
+          <input id="questIntervalDays" type="number" min="1" max="365" value="${intervalDays}">
+          <span>day${intervalDays === 1 ? "" : "s"}</span>
+        </div>
+      `)}
+    </div>
+
+    <div id="weekdayOptions" class="weekday-picker" hidden>
+      ${weekdayCheckboxes(quest.weekdays || [])}
+    </div>
+
+    ${formField(`<span id="questDueDateLabel">${scheduleType === "one-time" ? "Due date" : "Start / due date"}</span>`,
+      `<input id="questDueDate" type="date" value="${escapeAttribute(quest.dueDate || quest.startDate || getTodayKey())}">`,
+      true
+    )}
+
+    ${formField("Due time", `<input id="questDueTime" type="time" value="${escapeAttribute(quest.dueTime || "")}">`)}
+
+    ${formField("Notes", `<input id="questTime" value="${escapeAttribute(quest.time || "")}" placeholder="Optional note, e.g. before bed">`)}
+  `;
+}
+
+function readQuestScheduleForm() {
+  const scheduleType = document.getElementById("questScheduleType").value;
+  const dueDate = document.getElementById("questDueDate").value;
+  return {
+    parentQuestId: document.getElementById("questParent").value || "",
+    type: scheduleType,
+    scheduleType,
+    intervalDays: Math.max(1, Number(document.getElementById("questIntervalDays")?.value || 1)),
+    weekdays: getSelectedWeekdays(),
+    startDate: dueDate || getTodayKey(),
+    dueDate,
+    dueTime: document.getElementById("questDueTime").value,
+    time: document.getElementById("questTime").value.trim()
+  };
+}
+
+function renderQuestManagerRow(quest, allQuests, kidNames) {
+  const byId = Object.fromEntries(allQuests.map(item => [item.questId, item]));
+  const depth = questHierarchyDepth(quest, byId);
+  const childCount = allQuests.filter(item => item.parentQuestId === quest.questId && item.archived !== true).length;
+  return `
+    <div class="task-manager-row ${quest.archived === true ? "archived" : ""}" style="--task-depth:${depth}">
+      <div class="task-manager-main">
+        <span class="task-manager-check">${quest.archived === true ? "📦" : depth ? "↳" : "○"}</span>
+        <div class="task-manager-copy">
+          <strong>${escapeHtml(quest.name || "Unnamed quest")}</strong>
+          <span>${escapeHtml(scheduleLabel(quest))} • ${escapeHtml(dueLabel(quest))}</span>
+          <small>${escapeHtml(kidNames[quest.kidId] || quest.kidId || "Unassigned")} • ${escapeHtml(questFoodTierLabel(quest))}${childCount ? ` • ${childCount} subtask${childCount === 1 ? "" : "s"}` : ""}</small>
+        </div>
+      </div>
+      <div class="task-manager-actions">
+        <button class="edit-quest-btn" type="button" data-quest-id="${escapeAttribute(quest.questId)}" ${quest.archived === true ? "disabled" : ""} title="Edit">✏️</button>
+        <button class="archive-quest-btn" type="button" data-quest-id="${escapeAttribute(quest.questId)}" data-archived="${quest.archived === true ? "true" : "false"}" title="${quest.archived === true ? "Restore" : "Archive"}">${quest.archived === true ? "♻️" : "📦"}</button>
+        <button class="delete-quest-btn" type="button" data-quest-id="${escapeAttribute(quest.questId)}" data-quest-name="${escapeAttribute(quest.name || "Unnamed quest")}" title="Delete">🗑️</button>
+      </div>
+    </div>`;
+}
+
 async function loadQuestManager(user) {
   setAppTheme("parent");
   const email = String(user?.email || "").toLowerCase();
@@ -3503,16 +3590,10 @@ async function loadNewQuestForm() {
   }
 }
 
-function formField(label, controlHtml) {
+function formField(label, controlHtml, rawLabel = false) {
   return `
-    <div
-      class="form-field"
-      style="display:flex; flex-direction:column; gap:4px;"
-    >
-      <label style="font-weight:700;">
-        ${escapeHtml(label)}
-      </label>
-
+    <div class="form-field">
+      <label>${rawLabel ? label : escapeHtml(label)}</label>
       ${controlHtml}
     </div>
   `;
