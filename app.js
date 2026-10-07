@@ -73,45 +73,77 @@ async function userCanAccessKid(kidId) {
 const THEME_PREF_KEY = "chorequestTheme";
 const THEME_OPTIONS = ["day", "night", "auto"];
 
-function resolvedThemePreference() {
+function storedThemePreference() {
   const stored = localStorage.getItem(THEME_PREF_KEY);
-  const preference = THEME_OPTIONS.includes(stored) ? stored : "auto";
+  return THEME_OPTIONS.includes(stored) ? stored : "auto";
+}
+
+function resolvedThemePreference() {
+  const preference = storedThemePreference();
   if (preference !== "auto") return preference;
   const hour = new Date().getHours();
   return hour >= 7 && hour < 19 ? "day" : "night";
 }
 
 function applyThemePreference() {
+  const preference = storedThemePreference();
   const resolved = resolvedThemePreference();
   document.body.classList.add("kid-theme");
   document.body.classList.toggle("day-theme", resolved === "day");
   document.body.classList.toggle("night-theme", resolved === "night");
-  const preference = localStorage.getItem(THEME_PREF_KEY) || "auto";
-  document.querySelectorAll(".theme-choice").forEach(button => {
-    button.classList.toggle("active", button.dataset.themeChoice === preference);
-  });
+
   const control = document.getElementById("themeModeControl");
-  if (control) control.dataset.selected = preference;
+  if (control) {
+    control.dataset.selected = preference;
+    control.dataset.resolved = resolved;
+    const icon = control.querySelector(".theme-knob-icon");
+    if (icon) icon.textContent = preference === "auto" ? "A" : resolved === "day" ? "☀️" : "🌙";
+    control.setAttribute(
+      "aria-label",
+      preference === "auto"
+        ? "Theme: Auto. Tap for manual mode; swipe for day or night."
+        : `Theme: ${resolved}. Tap for Auto; swipe for day or night.`
+    );
+  }
 }
 
 function ensureThemeControls() {
   if (document.getElementById("themeModeControl")) return;
-  const control = document.createElement("div");
+
+  const control = document.createElement("button");
   control.id = "themeModeControl";
   control.className = "theme-mode-control";
-  control.setAttribute("aria-label", "Theme");
-  control.innerHTML = `
-    <span class="theme-slider-indicator" aria-hidden="true"></span>
-    <button class="theme-choice" type="button" data-theme-choice="day" title="Day mode" aria-label="Day mode">☀️</button>
-    <button class="theme-choice" type="button" data-theme-choice="auto" title="Auto: day 7 AM–7 PM" aria-label="Auto theme">A</button>
-    <button class="theme-choice" type="button" data-theme-choice="night" title="Night mode" aria-label="Night mode">🌙</button>`;
+  control.type = "button";
+  control.innerHTML = '<span class="theme-knob-icon">A</span>';
   document.body.appendChild(control);
-  control.querySelectorAll(".theme-choice").forEach(button => {
-    button.addEventListener("click", () => {
-      localStorage.setItem(THEME_PREF_KEY, button.dataset.themeChoice);
-      applyThemePreference();
-    });
+
+  let startX = 0;
+  let startY = 0;
+
+  control.addEventListener("pointerdown", event => {
+    startX = event.clientX;
+    startY = event.clientY;
+    control.setPointerCapture?.(event.pointerId);
   });
+
+  control.addEventListener("pointerup", event => {
+    const dx = event.clientX - startX;
+    const dy = event.clientY - startY;
+    const isSwipe = Math.abs(dx) > 26 && Math.abs(dx) > Math.abs(dy);
+
+    if (isSwipe) {
+      localStorage.setItem(THEME_PREF_KEY, dx < 0 ? "day" : "night");
+    } else {
+      const current = storedThemePreference();
+      localStorage.setItem(
+        THEME_PREF_KEY,
+        current === "auto" ? resolvedThemePreference() : "auto"
+      );
+    }
+
+    applyThemePreference();
+  });
+
   applyThemePreference();
 }
 
@@ -121,12 +153,14 @@ function setAppTheme(mode = "default") {
   document.body.classList.add("kid-theme");
   document.body.classList.toggle("parent-theme", mode === "parent");
   applyThemePreference();
+
   if (!themeControlObserver) {
     themeControlObserver = new MutationObserver(() => {
       if (!document.getElementById("themeModeControl")) ensureThemeControls();
     });
     themeControlObserver.observe(document.body, { childList: true });
   }
+
   requestAnimationFrame(ensureThemeControls);
 }
 
