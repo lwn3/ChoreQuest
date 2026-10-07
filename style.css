@@ -3399,3 +3399,227 @@ body.kid-theme .toast {
     margin-left: 12px;
   }
 }
+
+
+/* =========================================================
+   DAY / NIGHT / AUTO THEME
+========================================================= */
+
+.theme-mode-control {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  right: 10px;
+  z-index: 10000;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(12, 18, 36, .72);
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  backdrop-filter: blur(16px);
+}
+
+.theme-mode-control button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  color: #cbd5eb;
+  font-size: .8rem;
+  font-weight: 900;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: none;
+}
+
+.theme-mode-control button.active {
+  color: #fff;
+  background: rgba(138,99,255,.75);
+  box-shadow: 0 4px 12px rgba(82,72,180,.28);
+}
+
+body.day-theme {
+  --bg-deep: #eef4ff;
+  --bg-mid: #f7f9ff;
+  --bg-light: #ffffff;
+  --panel: rgba(255,255,255,.88);
+  --panel-solid: #ffffff;
+  --panel-light: #f5f8ff;
+  --text: #18233d;
+  --text-soft: #66728f;
+  --primary: #6f56e8;
+  --primary-bright: #816cff;
+  --secondary: #18a995;
+  --gold: #c58d12;
+  --success: #15966d;
+  --warning: #b96e0f;
+  --danger: #d94c68;
+  --info: #337fd1;
+  --border: rgba(37,57,92,.10);
+  --border-bright: rgba(37,57,92,.18);
+  --shadow-small: 0 8px 24px rgba(66,88,130,.10);
+  --shadow-large: 0 18px 46px rgba(66,88,130,.14);
+
+  color: var(--text);
+  background:
+    radial-gradient(circle at 10% -10%, rgba(129,108,255,.16), transparent 33%),
+    radial-gradient(circle at 90% 0%, rgba(24,169,149,.11), transparent 28%),
+    linear-gradient(150deg, #edf4ff 0%, #f9fbff 48%, #edf8f6 100%);
+}
+
+body.day-theme::before {
+  opacity: .18;
+  background-image:
+    linear-gradient(rgba(44,66,102,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(44,66,102,.035) 1px, transparent 1px);
+}
+
+body.day-theme .card,
+body.day-theme .quick-panel-card,
+body.day-theme .ff9-character-details,
+body.day-theme .jrpg-menu-card,
+body.day-theme .equipment-chooser-host,
+body.day-theme .character-portrait-frame,
+body.day-theme .battle-fighter,
+body.day-theme .battle-fighter.enemy,
+body.day-theme .adventure-option {
+  color: var(--text);
+  background:
+    linear-gradient(155deg, rgba(255,255,255,.95), rgba(247,250,255,.94));
+  border-color: rgba(37,57,92,.10);
+  box-shadow:
+    0 12px 28px rgba(66,88,130,.10),
+    inset 0 1px 0 rgba(255,255,255,.8);
+}
+
+body.day-theme .hero h1,
+body.day-theme .card h2,
+body.day-theme strong,
+body.day-theme .quest-info strong,
+body.day-theme .task-manager-copy strong {
+  color: #18233d;
+}
+
+body.day-theme .hero p,
+body.day-theme .xp-text,
+body.day-theme .quest-info span,
+body.day-theme .quest-info small,
+body.day-theme .task-manager-copy span,
+body.day-theme .task-manager-copy small,
+body.day-theme .jrpg-section-heading p,
+body.day-theme .companion-slot span,
+body.day-theme .battle-log p,
+body.day-theme .adventure-copy small,
+body.day-theme .adventure-resource-head span,
+body.day-theme .food-use-btn small {
+  color: #6c7892;
+}
+
+body.day-theme .quest,
+body.day-theme .equipment-slot-row,
+body.day-theme .equipment-choice-row,
+body.day-theme .loadout-slot,
+body.day-theme .jrpg-stat-row,
+body.day-theme .adventure-resource-head > div,
+body.day-theme .food-use-btn,
+body.day-theme .battle-log p,
+body.day-theme .mod-gear-row,
+body.day-theme .bulk-review-check {
+  background: rgba(79,101,145,.035);
+  border-color: rgba(37,57,92,.09);
+}
+
+body.day-theme .account-header,
+body.day-theme .theme-mode-control {
+  background: rgba(255,255,255,.82);
+  border-color: rgba(37,57,92,.10);
+}
+
+body.day-theme .theme-mode-control button {
+  color: #64718d;
+}
+
+body.day-theme .theme-mode-control button.active {
+  color: #fff;
+  background: #6f56e8;
+}
+
+body.day-theme input,
+body.day-theme select,
+body.day-theme textarea,
+body.day-theme .form-card input:not([type="checkbox"]),
+body.day-theme .form-card select,
+body.day-theme .form-card textarea,
+body.day-theme .login-card input,
+body.day-theme .mod-control-grid input,
+body.day-theme .mod-control-grid select,
+body.day-theme .mod-gear-row select {
+  color: #18233d;
+  background: #fff;
+  border-color: rgba(37,57,92,.13);
+}
+
+body.day-theme .class-path {
+  color: #6650d6;
+  background: rgba(111,86,232,.08);
+  border-color: rgba(111,86,232,.17);
+}
+
+body.day-theme .stat-radar-label {
+  fill: #42516e;
+}
+
+body.day-theme .stat-radar-ring,
+body.day-theme .stat-radar-axis {
+  stroke: rgba(61,82,119,.14);
+}
+
+body.day-theme .stat-radar-ring.outer {
+  stroke: rgba(61,82,119,.25);
+}
+
+body.day-theme .quick-panel-btn,
+body.day-theme .battle-action-btn,
+body.day-theme .task-manager-actions button,
+body.day-theme .battle-retreat-btn,
+body.day-theme #switchCharacterBtn,
+body.day-theme #backHomeBtn,
+body.day-theme #classScreenBackBtn,
+body.day-theme #adventureBackBtn {
+  color: #33415f;
+  background: rgba(255,255,255,.82);
+  border-color: rgba(37,57,92,.11);
+}
+
+body.day-theme .quick-panel-btn.active,
+body.day-theme .equipment-choice-row.selected {
+  background: rgba(111,86,232,.09);
+  border-color: rgba(111,86,232,.20);
+}
+
+body.day-theme .quest-locked {
+  opacity: .68;
+}
+
+body.night-theme .quest-locked {
+  opacity: .7;
+}
+
+@media (max-width: 520px) {
+  .theme-mode-control {
+    top: max(7px, env(safe-area-inset-top));
+    right: 7px;
+  }
+
+  .theme-mode-control button {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
+  }
+}
