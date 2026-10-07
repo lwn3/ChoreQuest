@@ -1389,6 +1389,43 @@ function renderEquippedLoadout(equipment) {
   }).join("");
 }
 
+function renderActiveCompanions(kid) {
+  const active = Array.isArray(kid?.activeCompanions) ? kid.activeCompanions.slice(0, 2) : [];
+  const slots = [0, 1].map(index => {
+    const companion = active[index];
+    if (!companion) {
+      return `
+        <div class="companion-slot empty">
+          <div class="companion-icon">🐾</div>
+          <div>
+            <small>Companion ${index + 1}</small>
+            <strong>Empty</strong>
+            <span>Future tamed companions can be assigned here.</span>
+          </div>
+        </div>`;
+    }
+    const name = companion.name || "Companion";
+    const icon = companion.icon || "🐾";
+    const ability = companion.abilityName || companion.ability || "Companion ability";
+    const text = companion.abilityText || companion.description || "Provides a special battle effect.";
+    return `
+      <div class="companion-slot">
+        <div class="companion-icon">${escapeHtml(icon)}</div>
+        <div>
+          <small>Active companion</small>
+          <strong>${escapeHtml(name)}</strong>
+          <span><b>${escapeHtml(ability)}:</b> ${escapeHtml(text)}</span>
+        </div>
+      </div>`;
+  }).join("");
+
+  return `
+    <div class="companion-summary">
+      <p>Bring up to <strong>2</strong> companions. They support your class with special abilities rather than replacing your character in battle.</p>
+      <div class="companion-slot-list">${slots}</div>
+    </div>`;
+}
+
 function renderClassScreen(kid) {
   const def = CLASS_DEFINITIONS[kid.classId];
   const level = Math.max(1, Number(kid.level || 1));
@@ -1447,6 +1484,29 @@ function renderClassScreen(kid) {
         </div>
       </section>
 
+      <section class="character-quick-panels">
+        <div class="character-quick-tabs">
+          <button class="quick-panel-btn" type="button" data-panel-target="gearQuickPanel">
+            ⚔️ Gear <span>${Object.keys(equipped).length}/${Object.keys(EQUIPMENT_SLOTS).length}</span>
+          </button>
+          <button class="quick-panel-btn" type="button" data-panel-target="companionQuickPanel">
+            🐾 Companions <span>${Math.min(2, Array.isArray(kid.activeCompanions) ? kid.activeCompanions.length : 0)}/2</span>
+          </button>
+        </div>
+        <div id="gearQuickPanel" class="quick-panel-card" hidden>
+          <div class="jrpg-section-heading">
+            <div><h2>Current Gear</h2><p>Your equipped items at a glance.</p></div>
+          </div>
+          <div class="loadout-grid">${renderEquippedLoadout(equipped)}</div>
+        </div>
+        <div id="companionQuickPanel" class="quick-panel-card" hidden>
+          <div class="jrpg-section-heading">
+            <div><h2>Companions</h2><p>Tamed allies provide special battle abilities and utility.</p></div>
+          </div>
+          ${renderActiveCompanions(kid)}
+        </div>
+      </section>
+
       <section class="card jrpg-menu-card attribute-overview-card">
         <div class="jrpg-section-heading">
           <div><h2>Attributes</h2><p>Level growth plus equipment bonuses.</p></div>
@@ -1463,17 +1523,6 @@ function renderClassScreen(kid) {
       <section class="card"><h2>Abilities & Spells</h2>
         ${unlocked.map(a => `<div class="quest"><div class="quest-icon">✨</div><div class="quest-info"><strong>${escapeHtml(a.name)}</strong><span>Unlocked at Level ${a.level}</span><small class="status status-approved">${escapeHtml(a.text)}</small></div></div>`).join("")}
         ${locked.map(a => `<div class="quest"><div class="quest-icon">🔒</div><div class="quest-info"><strong>${escapeHtml(a.name)}</strong><span>Unlocks at Level ${a.level}</span></div></div>`).join("")}
-      </section>
-
-      <section class="card loadout-card">
-        <div class="jrpg-section-heading">
-          <div>
-            <h2>Current Loadout</h2>
-            <p>Your equipped Wood-tier gear at a glance.</p>
-          </div>
-          <span>${Object.keys(equipped).length}/${Object.keys(EQUIPMENT_SLOTS).length}</span>
-        </div>
-        <div class="loadout-grid">${renderEquippedLoadout(equipped)}</div>
       </section>
 
       <section class="card jrpg-menu-card">
@@ -1622,6 +1671,19 @@ function renderClassScreen(kid) {
     renderChooser();
     chooserHost.scrollIntoView({ behavior: "smooth", block: "start" });
   };
+  document.querySelectorAll(".quick-panel-btn").forEach(button => {
+    button.addEventListener("click", () => {
+      const targetId = button.dataset.panelTarget;
+      document.querySelectorAll(".quick-panel-card").forEach(panel => {
+        panel.hidden = panel.id === targetId ? !panel.hidden : true;
+      });
+      document.querySelectorAll(".quick-panel-btn").forEach(tab => {
+        const panel = document.getElementById(tab.dataset.panelTarget);
+        tab.classList.toggle("active", panel && !panel.hidden);
+      });
+    });
+  });
+
   document.querySelectorAll(".equipment-slot-row").forEach(button => {
     button.addEventListener("click", () => openEquipmentChooser(button.dataset.equipmentSlot));
   });
@@ -1809,6 +1871,37 @@ function renderParentDashboard(data, user) {
     <main class="app">
       ${renderSignOutHeader(user)}
       <header class="hero compact"><div class="logo">🛡️</div><h1>Guild Hall</h1><p>Quest Review & Family Progress</p></header>
+
+      <details class="card quest-review-card" open>
+        <summary>
+          <span>Quest Review</span>
+          <strong>${pending.length} pending</strong>
+        </summary>
+        ${pending.length === 0 ? "<p>No quests pending approval.</p>" : `
+          <div class="bulk-review-toolbar">
+            <label><input id="selectAllPendingQuests" type="checkbox" checked> Select all</label>
+            <button id="approveSelectedQuestsBtn" type="button">✅ Approve Checked</button>
+          </div>
+          <div class="bulk-review-list">
+            ${pending.map(item => {
+              const names = (item.participantIds || []).map(id => data.kids.find(k => k.kidId === id)?.name || id);
+              return `
+                <div class="bulk-review-row">
+                  <label class="bulk-review-check">
+                    <input class="pending-quest-check" type="checkbox" value="${escapeAttribute(item.submissionId)}" checked>
+                    <span class="quest-icon">📜</span>
+                    <span class="quest-info">
+                      <strong>${escapeHtml(item.questName || "Quest")}</strong>
+                      <span>${item.isSideQuest ? "Side Quest" : "Main Quest"} • ${escapeHtml(names.join(", "))}</span>
+                      <small class="status status-pending">Submitted ${formatDateTime(item.submittedAt)}</small>
+                    </span>
+                  </label>
+                  <button class="reject-submission-btn compact-danger" type="button" data-submission-id="${escapeAttribute(item.submissionId)}" aria-label="Reject ${escapeAttribute(item.questName || "quest")}">✕</button>
+                </div>`;
+            }).join("")}
+          </div>`}
+      </details>
+
       <section class="card">
         <h2>Adventurers</h2>
         ${data.kids.map(kid => {
@@ -1822,30 +1915,52 @@ function renderParentDashboard(data, user) {
           </button>`;
         }).join("")}
       </section>
-      <section class="card">
-        <h2>Quest Review</h2>
-        ${pending.length === 0 ? "<p>No quests pending approval.</p>" : pending.map(item => {
-          const names = item.participantIds.map(id => data.kids.find(k => k.kidId === id)?.name || id);
-          return `<div class="quest"><div class="quest-icon">📜</div><div class="quest-info">
-            <strong>${escapeHtml(item.questName || "Quest")}</strong>
-            <span>${item.isSideQuest ? "Side Quest" : "Main Quest"} • ${escapeHtml(names.join(", "))}</span>
-            <small class="status status-pending">Submitted ${formatDateTime(item.submittedAt)}</small>
-          </div><div class="parent-buttons">
-            <button class="approve-submission-btn" type="button" data-submission-id="${escapeAttribute(item.submissionId)}">✅</button>
-            <button class="reject-submission-btn" type="button" data-submission-id="${escapeAttribute(item.submissionId)}">❌</button>
-          </div></div>`;
-        }).join("")}
-      </section>
+
       ${isGuildMaster ? '<a class="character parent-link" href="?manager=true"><div class="avatar">📋</div><div><strong>Quest Manager</strong><span>View and manage blueprints</span></div></a>' : ''}
       <a class="character parent-link" href="?family=true"><div class="avatar">👨‍👩‍👧‍👦</div><div><strong>Family Accounts</strong><span>Create profiles and set or reset PINs</span></div></a>
     </main>`;
+
   attachSignOutEvent();
-  document.querySelectorAll('.approve-submission-btn').forEach(b => b.addEventListener('click', () => approveSubmission(b.dataset.submissionId)));
+
+  document.getElementById("selectAllPendingQuests")?.addEventListener("change", event => {
+    document.querySelectorAll(".pending-quest-check").forEach(check => {
+      check.checked = event.target.checked;
+    });
+  });
+
+  document.querySelectorAll(".pending-quest-check").forEach(check => {
+    check.addEventListener("change", () => {
+      const all = Array.from(document.querySelectorAll(".pending-quest-check"));
+      const selectAll = document.getElementById("selectAllPendingQuests");
+      if (selectAll) selectAll.checked = all.length > 0 && all.every(item => item.checked);
+    });
+  });
+
+  document.getElementById("approveSelectedQuestsBtn")?.addEventListener("click", async () => {
+    const selectedIds = Array.from(document.querySelectorAll(".pending-quest-check:checked")).map(check => check.value);
+    if (!selectedIds.length) {
+      alert("Select at least one quest to approve.");
+      return;
+    }
+    const button = document.getElementById("approveSelectedQuestsBtn");
+    button.disabled = true;
+    button.textContent = "Approving...";
+    try {
+      for (const submissionId of selectedIds) {
+        await approveSubmissionCore(submissionId);
+      }
+      await loadParentDashboard(auth.currentUser);
+    } catch (err) {
+      alert("Could not approve selected quests: " + err.message);
+      await loadParentDashboard(auth.currentUser);
+    }
+  });
+
   document.querySelectorAll('.reject-submission-btn').forEach(b => b.addEventListener('click', () => rejectSubmission(b.dataset.submissionId)));
   document.querySelectorAll('.child-detail-btn').forEach(b => b.addEventListener('click', () => loadChildDetail(b.dataset.kidId, user)));
 }
 
-async function approveSubmission(submissionId) {
+async function approveSubmissionCore(submissionId) {
   try {
     const subRef = doc(db, "questSubmissions", submissionId);
     const subSnap = await getDoc(subRef);
@@ -1898,8 +2013,19 @@ async function approveSubmission(submissionId) {
       active: getQuestScheduleType(quest) === "one-time" ? false : quest.active !== false
     });
     await refreshAllStreaks();
+    return true;
+  } catch (err) {
+    throw err;
+  }
+}
+
+async function approveSubmission(submissionId) {
+  try {
+    await approveSubmissionCore(submissionId);
     await loadParentDashboard(auth.currentUser);
-  } catch (err) { alert("Could not approve submission: " + err.message); }
+  } catch (err) {
+    alert("Could not approve submission: " + err.message);
+  }
 }
 
 async function rejectSubmission(submissionId) {
