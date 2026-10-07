@@ -2620,7 +2620,8 @@ async function loadAdventureScreen(kidId) {
     if (!kidSnap.exists()) { showError("Adventurer not found."); return; }
     let kid = { kidId, ...kidSnap.data() };
     kid = await ensureInventoryInitialized(kid);
-    const stats = kid.classId && CLASS_DEFINITIONS[kid.classId] ? getClassStats(kid) : null;
+    kid = await ensureClassProgressionInitialized(kid);
+    const stats = getClassStats(kid);
     const energy = Math.min(MAX_ENERGY, Number(kid.energy ?? MAX_ENERGY));
     const sleepy = currentSleepiness(kid);
     const adventures = [
