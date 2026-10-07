@@ -3417,11 +3417,11 @@ body.kid-theme .toast {
   height: 42px;
   min-height: 42px;
   padding: 0;
-  color: #ffffff;
-  background: rgba(138, 99, 255, .94);
+  color: var(--text);
+  background: rgba(255,255,255,.08);
   border: 0;
   border-radius: 50%;
-  box-shadow: 0 8px 24px rgba(53, 46, 150, .28);
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
   backdrop-filter: blur(14px);
   touch-action: none;
   user-select: none;
@@ -3543,8 +3543,8 @@ body.day-theme .account-header {
 }
 
 body.day-theme .theme-mode-control {
-  color: #ffffff;
-  background: #6f56e8;
+  color: #33415f;
+  background: rgba(255,255,255,.78);
 }
 
 
