@@ -229,42 +229,7 @@ const ITEM_TYPES = {
   willow_ring: { name: "Ring", slot: "accessory", icon: "💍", iconFile: "wooden_pendant.webp", bonuses: { kindness: 2 } }
 };
 
-const INVENTORY_VERSION = 3;
-const STARTER_ITEM_TYPES = [
-  "wooden_sword",
-  "stick",
-  "branch",
-  "wooden_bow",
-  "wooden_axe",
-  "wooden_shield",
-  "wooden_tome",
-  "carved_rune_slate",
-  "bark_cap",
-  "wooden_helmet",
-  "wooden_circlet",
-  "wooden_hat",
-  "wood_crown",
-  "wooden_tunic",
-  "wooden_robes",
-  "wooden_boots",
-  "wooden_shoes",
-  "wooden_slippers",
-  "leaf_cape",
-  "moss_cloak",
-  "wooden_pendant",
-  "acorn_charm",
-  "pinecone_amulet"
-];
-
-const STARTER_EQUIPMENT_TYPES = {
-  head: "bark_cap",
-  body: "wooden_tunic",
-  feet: "wooden_boots",
-  cape: "leaf_cape",
-  main_hand: "wooden_sword",
-  off_hand: "wooden_shield"
-};
-
+const INVENTORY_VERSION = 4;
 const EQUIPMENT_SLOTS = {
   head: "Head",
   body: "Body",
@@ -298,10 +263,6 @@ function createItem(itemType, rarity = "common") {
   };
 }
 
-function starterInventory() {
-  return STARTER_ITEM_TYPES.map(itemType => createItem(itemType, "common"));
-}
-
 function normalizeStoredItem(item) {
   if (!item || typeof item !== "object") return item;
   const def = ITEM_TYPES[item.itemType];
@@ -327,8 +288,6 @@ function normalizeStoredItem(item) {
 
 async function ensureInventoryInitialized(kid) {
   const hasCurrentVersion = Number(kid.inventoryVersion || 0) >= INVENTORY_VERSION;
-  if (hasCurrentVersion && Array.isArray(kid.inventory) && kid.equipment && typeof kid.equipment === "object") return kid;
-
   const inventory = (Array.isArray(kid.inventory) ? kid.inventory : []).map(normalizeStoredItem).filter(Boolean);
   const equipment = Object.fromEntries(
     Object.entries(kid.equipment && typeof kid.equipment === "object" ? kid.equipment : {})
@@ -336,30 +295,17 @@ async function ensureInventoryInitialized(kid) {
       .filter(([, item]) => Boolean(item))
   );
 
-  const ownedCommonTypes = new Set([
-    ...inventory.filter(item => normalizeRarity(item.rarity || item.grade) === "common").map(item => item.itemType),
-    ...Object.values(equipment).filter(item => normalizeRarity(item?.rarity || item?.grade) === "common").map(item => item.itemType)
-  ]);
+  if (hasCurrentVersion && Array.isArray(kid.inventory) && kid.equipment && typeof kid.equipment === "object") {
+    return {...kid, inventory, equipment};
+  }
 
-  STARTER_ITEM_TYPES.forEach(itemType => {
-    if (!ownedCommonTypes.has(itemType)) inventory.push(createItem(itemType, "common"));
-  });
-
-  Object.entries(STARTER_EQUIPMENT_TYPES).forEach(([slot, itemType]) => {
-    if (equipment[slot]) return;
-    const inventoryIndex = inventory.findIndex(item => item.itemType === itemType && normalizeRarity(item.rarity || item.grade) === "common");
-    if (inventoryIndex < 0) return;
-    const [item] = inventory.splice(inventoryIndex, 1);
-    equipment[slot] = { ...item, equipped: true };
-  });
-
-  const normalizedInventory = inventory.map(item => ({ ...item, equipped: false }));
+  const normalizedInventory = inventory.map(item => ({...item, equipped:false}));
   await updateDoc(doc(db, "kids", kid.kidId), {
     inventory: normalizedInventory,
     equipment,
     inventoryVersion: INVENTORY_VERSION
   });
-  return { ...kid, inventory: normalizedInventory, equipment, inventoryVersion: INVENTORY_VERSION };
+  return {...kid, inventory:normalizedInventory, equipment, inventoryVersion:INVENTORY_VERSION};
 }
 
 function itemIcon(item) {
