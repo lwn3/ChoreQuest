@@ -41,6 +41,8 @@ const ANYONE_ID = "ANYONE";
 const listChildProfilesCall = httpsCallable(functions, "listChildProfiles");
 const loginChildCall = httpsCallable(functions, "loginChild");
 const setChildPinCall = httpsCallable(functions, "setChildPin");
+const consumeFoodCall = httpsCallable(functions, "consumeFood");
+const runAdventureCall = httpsCallable(functions, "runAdventure");
 
 async function getChildIdentity(user = auth.currentUser) {
   if (!user) return null;
@@ -401,6 +403,62 @@ function equipmentBonuses(equipment) {
 function formatBonuses(item) {
   const entries = Object.entries(item?.bonuses || {}).filter(([, value]) => Number(value) !== 0);
   return entries.length ? entries.map(([key, value]) => `+${value} ${key[0].toUpperCase()}${key.slice(1)}`).join(" • ") : "Cosmetic item";
+}
+
+
+const MAX_ENERGY = 30;
+const MAX_SLEEPINESS = 8;
+
+const CANDY_FOODS = {
+  gummy_bears: { name: "Gummy Bears", icon: "🍬", energy: 3 },
+  chocolate_bar: { name: "Chocolate Bar", icon: "🍫", energy: 6 },
+  lollipop: { name: "Lollipop", icon: "🍭", energy: 10 },
+  streak_bubble_gum: { name: "Streak Bubble Gum", icon: "🫧", energy: 15, streakOnly: true }
+};
+
+const AUTUMN_FOODS = {
+  apple_slices: { name: "Apple Slices", icon: "🍎", energy: 3 },
+  rice_ball: { name: "Rice Ball", icon: "🍙", energy: 6 },
+  dumplings: { name: "Dumplings", icon: "🥟", energy: 10 },
+  streak_ramen: { name: "Streak Ramen Packet", icon: "🍜", energy: 15, streakOnly: true }
+};
+
+function foodCatalogForKid(kid) {
+  return String(kid?.name || "").trim().toLowerCase() === "autumn" ? AUTUMN_FOODS : CANDY_FOODS;
+}
+
+function regularFoodIdsForKid(kid) {
+  return Object.entries(foodCatalogForKid(kid)).filter(([, food]) => !food.streakOnly).map(([id]) => id);
+}
+
+function streakFoodIdForKid(kid) {
+  return String(kid?.name || "").trim().toLowerCase() === "autumn" ? "streak_ramen" : "streak_bubble_gum";
+}
+
+function questFoodRewardId(kid, quest, isFullReward = true) {
+  const ids = regularFoodIdsForKid(kid);
+  if (!isFullReward) return ids[0];
+  const difficulty = Number(quest?.xp || 0);
+  if (difficulty >= 60) return ids[2];
+  if (difficulty >= 30) return ids[1];
+  return ids[0];
+}
+
+function foodInventoryHtml(kid) {
+  const inventory = kid?.foodInventory && typeof kid.foodInventory === "object" ? kid.foodInventory : {};
+  const catalog = foodCatalogForKid(kid);
+  const entries = Object.entries(catalog).filter(([id]) => Number(inventory[id] || 0) > 0);
+  if (!entries.length) return '<p class="energy-empty">Complete approved quests to earn adventure food.</p>';
+  return entries.map(([id, food]) => `
+    <button class="food-use-btn" type="button" data-food-id="${escapeAttribute(id)}">
+      <span>${food.icon}</span>
+      <strong>${escapeHtml(food.name)}</strong>
+      <small>+${food.energy} Energy • x${Number(inventory[id] || 0)}</small>
+    </button>`).join("");
+}
+
+function currentSleepiness(kid) {
+  return kid?.sleepinessDate === getTodayKey() ? Number(kid.sleepiness || 0) : 0;
 }
 
 
@@ -1189,6 +1247,15 @@ function renderDashboard(kid, mainQuests, sideQuests, allKids) {
         <p class="xp-text">${xpIntoLevel} / ${xpNeeded} XP to next level</p>
       </section>
 
+      <section class="card adventure-resource-card">
+        <div class="adventure-resource-head">
+          <div><span>⚡ Energy</span><strong>${Math.min(MAX_ENERGY, Number(kid.energy ?? MAX_ENERGY))} / ${MAX_ENERGY}</strong></div>
+          <div><span>😴 Sleepiness</span><strong>${currentSleepiness(kid)} / ${MAX_SLEEPINESS}</strong></div>
+        </div>
+        <div class="food-inventory">${foodInventoryHtml(kid)}</div>
+        <button id="openAdventureBtn" type="button" style="width:100%;margin-top:12px;">🗺️ Adventure</button>
+      </section>
+
       <section class="card">
         <h2>⚔️ Main Quests</h2>
         <p class="xp-text">${completedMain} of ${mainQuests.length} completed today</p>
@@ -1208,6 +1275,19 @@ function renderDashboard(kid, mainQuests, sideQuests, allKids) {
   document.querySelectorAll(".complete-btn").forEach(button => {
     button.addEventListener("click", () => openQuestSubmission(button.dataset.choreId, kid.kidId, allKids));
   });
+  document.querySelectorAll(".food-use-btn").forEach(button => {
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        await consumeFoodCall({ kidId: kid.kidId, foodId: button.dataset.foodId });
+        await loadKidDashboard(kid.kidId);
+      } catch (err) {
+        alert(err?.message || "Could not use that food.");
+        button.disabled = false;
+      }
+    });
+  });
+  document.getElementById("openAdventureBtn")?.addEventListener("click", () => loadAdventureScreen(kid.kidId));
   document.getElementById("openClassBtn").addEventListener("click", () => loadClassScreen(kid.kidId));
   document.getElementById("switchCharacterBtn").addEventListener("click", async () => {
     sessionStorage.removeItem(KID_UNLOCK_KEY);
@@ -1735,7 +1815,7 @@ function questCard(quest, currentKidId) {
       <div class="quest-icon">${quest.completedToday ? "✅" : iconForQuest(quest.name || "")}</div>
       <div class="quest-info">
         <strong>${escapeHtml(quest.name || "Unnamed Quest")}</strong>
-        <span>${escapeHtml(scheduleLabel(quest))} • ${escapeHtml(dueLabel(quest))} • +${displayXp} XP • +${displayGold} Gold${isMain ? "" : " helper pool"}</span>
+        <span>${escapeHtml(scheduleLabel(quest))} • ${escapeHtml(dueLabel(quest))} • Adventure food on approval${isMain ? "" : " • helper snack"}</span>
         <small class="status ${quest.completedToday ? "status-approved" : quest.pendingByCurrentKid ? "status-pending" : "status-ready"}">
           ${quest.completedToday ? "Completed for this schedule" : quest.pendingByCurrentKid ? "Your claim is awaiting approval" : isMain ? "Your responsibility" : quest.kidId === ANYONE_ID ? "Available to anyone" : "Help another adventurer"}
         </small>
