@@ -2826,19 +2826,23 @@ const MOD_PROFILE_ID = "MODLAB";
 async function ensureModProfile() {
   const ref = doc(db, "kids", MOD_PROFILE_ID);
   const snap = await getDoc(ref);
-  if (snap.exists()) return { kidId: MOD_PROFILE_ID, ...snap.data() };
+  if (snap.exists()) return {kidId:MOD_PROFILE_ID, ...snap.data()};
 
   const data = {
     name: "Guildmaster Test Adventurer",
     avatar: "🧪",
     active: false,
-    classId: "warrior",
-    classTitle: "Warrior",
-    classPath: "Warrior",
+    classId: "noob",
+    classTitle: "Noob",
+    classPath: "Noob",
+    classLevels: {noob:1},
+    classXp: {noob:0},
+    supportClasses: [],
+    masteredClasses: [],
     level: 1,
     xp: 0,
     gold: 0,
-    sp: 10,
+    sp: 0,
     energy: MAX_ENERGY,
     sleepiness: 0,
     sleepinessDate: getTodayKey(),
@@ -2847,16 +2851,11 @@ async function ensureModProfile() {
     inventory: [],
     equipment: {},
     inventoryVersion: INVENTORY_VERSION,
-    foodInventory: {
-      gummy_bears: 10,
-      chocolate_bar: 10,
-      lollipop: 10,
-      streak_bubble_gum: 3
-    },
+    foodInventory: {},
     modProfile: true
   };
   await setDoc(ref, data);
-  return { kidId: MOD_PROFILE_ID, ...data };
+  return {kidId:MOD_PROFILE_ID, ...data};
 }
 
 async function loadModLab(user) {
