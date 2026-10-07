@@ -86,9 +86,12 @@ function applyThemePreference() {
   document.body.classList.add("kid-theme");
   document.body.classList.toggle("day-theme", resolved === "day");
   document.body.classList.toggle("night-theme", resolved === "night");
+  const preference = localStorage.getItem(THEME_PREF_KEY) || "auto";
   document.querySelectorAll(".theme-choice").forEach(button => {
-    button.classList.toggle("active", button.dataset.themeChoice === (localStorage.getItem(THEME_PREF_KEY) || "auto"));
+    button.classList.toggle("active", button.dataset.themeChoice === preference);
   });
+  const control = document.getElementById("themeModeControl");
+  if (control) control.dataset.selected = preference;
 }
 
 function ensureThemeControls() {
@@ -98,9 +101,10 @@ function ensureThemeControls() {
   control.className = "theme-mode-control";
   control.setAttribute("aria-label", "Theme");
   control.innerHTML = `
-    <button class="theme-choice" type="button" data-theme-choice="day" title="Day mode">☀️</button>
-    <button class="theme-choice" type="button" data-theme-choice="night" title="Night mode">🌙</button>
-    <button class="theme-choice" type="button" data-theme-choice="auto" title="Auto: day 7 AM–7 PM">A</button>`;
+    <span class="theme-slider-indicator" aria-hidden="true"></span>
+    <button class="theme-choice" type="button" data-theme-choice="day" title="Day mode" aria-label="Day mode">☀️</button>
+    <button class="theme-choice" type="button" data-theme-choice="auto" title="Auto: day 7 AM–7 PM" aria-label="Auto theme">A</button>
+    <button class="theme-choice" type="button" data-theme-choice="night" title="Night mode" aria-label="Night mode">🌙</button>`;
   document.body.appendChild(control);
   control.querySelectorAll(".theme-choice").forEach(button => {
     button.addEventListener("click", () => {
