@@ -1680,21 +1680,28 @@ function renderActiveCompanions(kid) {
 }
 
 function renderClassScreen(kid) {
-  const def = CLASS_DEFINITIONS[kid.classId];
-  const level = Math.max(1, Number(kid.level || 1));
+  const def = CLASS_DEFINITIONS[kid.classId] || CLASS_DEFINITIONS.noob;
+  const characterLevel = Math.max(1, Number(kid.level || 1));
+  const classProgress = currentClassXpProgress(kid);
+  const classLevel = classProgress.level;
   const stats = getClassStats(kid);
   const baseStats = getBaseClassStats(kid);
   const title = getCurrentClassTitle(kid);
-  const combatProgression = classCombatProgression(kid.classId);
-  const unlocked = combatProgression.skills.filter(a => level >= a.level);
-  const locked = combatProgression.skills.filter(a => level < a.level);
-  const perkCards = classPerkCards(kid);
+  const currentSkills = learnedActiveSkills(kid, kid.classId);
+  const globalPassives = earnedPassivePerks(kid);
   const equipped = kid.equipment && typeof kid.equipment === "object" ? kid.equipment : {};
   const equippedGearCount = Object.keys(EQUIPMENT_SLOTS).filter(slot => equipped[slot]).length;
   const inventory = Array.isArray(kid.inventory) ? kid.inventory : [];
   const gearBonuses = equipmentBonuses(equipped);
-  const canChooseBranch1 = level >= 5 && !kid.classBranch1;
-  const canChooseBranch2 = level >= 10 && kid.classBranch1 && !kid.classBranch2;
+  const supportSlots = supportSlotCount(kid);
+  const selectedSupports = Array.isArray(kid.supportClasses) ? kid.supportClasses.slice(0, supportSlots) : [];
+  const learnedIds = learnedClassIds(kid);
+  const learnedSupportIds = learnedIds.filter(id => id !== kid.classId);
+  const rewardLevels = [1, 3, 5, 7, 9].filter(level => level <= def.maxLevel);
+  const categoryOrder = ["Starter", "Basic", "Core", "Odd Job", "Advanced", "Hybrid", "Prestige", "Secret Prestige"];
+  const visibleClasses = CLASS_IDS
+    .filter(id => classIsVisible(kid, id))
+    .map(id => CLASS_DEFINITIONS[id]);
 
   const equipmentRows = Object.entries(EQUIPMENT_SLOTS).map(([slot, label]) => {
     const item = equipped[slot];
@@ -1720,25 +1727,98 @@ function renderClassScreen(kid) {
       <small>Gear +${Number(gearBonuses[key] || 0)}</small>
     </div>`).join("");
 
+  const supportOptions = (selectedId = "") => `
+    <option value="">None</option>
+    ${learnedSupportIds.map(id => {
+      const supportDef = CLASS_DEFINITIONS[id];
+      return `<option value="${escapeAttribute(id)}" ${selectedId === id ? "selected" : ""}>${escapeHtml(supportDef.name)} Lv ${classLevelFor(kid, id)}</option>`;
+    }).join("")}`;
+
+  const classTreeHtml = categoryOrder.map(category => {
+    const entries = visibleClasses.filter(item => item.category === category);
+    if (!entries.length) return "";
+    return `
+      <details class="class-tree-group" ${["Starter","Basic","Core"].includes(category) ? "open" : ""}>
+        <summary><span>${escapeHtml(category)}</span><strong>${entries.length}</strong></summary>
+        <div class="class-tree-grid">
+          ${entries.map(classDef => {
+            const unlocked = classIsUnlocked(kid, classDef.id);
+            const learnedLevel = classLevelFor(kid, classDef.id);
+            const isCurrent = classDef.id === kid.classId;
+            const mastered = learnedLevel >= classDef.maxLevel;
+            return `
+              <article class="class-tree-card ${unlocked ? "unlocked" : "locked"} ${isCurrent ? "current" : ""}">
+                <div class="class-tree-sprite">${renderClassSprite(classDef.id)}</div>
+                <div class="class-tree-copy">
+                  <div class="class-tree-name-row">
+                    <strong>${escapeHtml(classDef.name)}</strong>
+                    ${mastered ? '<span class="mastery-star">★</span>' : ""}
+                  </div>
+                  <span>${escapeHtml(classDef.role)}</span>
+                  <small>${learnedLevel ? `Class Lv ${learnedLevel}/${classDef.maxLevel}` : escapeHtml(classRequirementText(classDef))}</small>
+                </div>
+                ${isCurrent
+                  ? '<button type="button" disabled>Current</button>'
+                  : unlocked
+                    ? `<button class="switch-class-btn" type="button" data-class-id="${escapeAttribute(classDef.id)}">${learnedLevel ? "Use" : "Start"} Class</button>`
+                    : '<button type="button" disabled>Locked</button>'}
+              </article>`;
+          }).join("")}
+        </div>
+      </details>`;
+  }).join("");
+
   document.body.innerHTML = `
     <main class="app">
-      <header class="hero compact">
-        <div class="logo">${def.icon}</div>
+      <header class="hero compact class-hero">
+        <div class="logo class-logo">${renderClassSprite(def.id, "hero-class-sprite")}</div>
         <h1>${escapeHtml(kid.name || kid.kidId)}</h1>
-        <p>${escapeHtml(title)} • Level ${level}</p>
-        <small class="class-path">${escapeHtml([def.name, kid.classBranch1 && getCurrentClassTitle({...kid,classBranch2:""}), kid.classBranch2 && title].filter(Boolean).join(" → "))}</small>
+        <p>${escapeHtml(title)} • Class Lv ${classLevel} • Character Lv ${characterLevel}</p>
+        <small class="class-path">${escapeHtml(def.category)} • ${escapeHtml(def.role)}</small>
       </header>
 
       <section class="ff9-character-summary">
         ${renderCharacterPortrait(kid)}
         <div class="ff9-character-details">
           <div><span>Class</span><strong>${escapeHtml(title)}</strong></div>
-          <div><span>Level</span><strong>${level}</strong></div>
+          <div><span>Class Lv</span><strong>${classLevel}/${def.maxLevel}</strong></div>
+          <div><span>Character Lv</span><strong>${characterLevel}</strong></div>
           <div><span>HP</span><strong>${stats.hp}</strong></div>
           <div><span>Gold</span><strong>${Number(kid.gold || 0)}</strong></div>
-          <div><span>SP</span><strong>${Number(kid.sp || 0)}</strong></div>
-          <div><span>Rebirths</span><strong>${Number(kid.rebirths || 0)}</strong></div>
+          <div><span>Mastered</span><strong>${CLASS_IDS.filter(id => classLevelFor(kid,id) >= CLASS_DEFINITIONS[id].maxLevel).length}</strong></div>
         </div>
+      </section>
+
+      <section class="card class-mastery-card">
+        <div class="class-mastery-head">
+          <div class="class-mastery-sprite">${renderClassSprite(def.id)}</div>
+          <div>
+            <small>Current class</small>
+            <h2>${escapeHtml(def.name)} Lv ${classLevel}</h2>
+            <p>${escapeHtml(def.role)}</p>
+          </div>
+          <strong>${classProgress.atCap ? "MASTERED ★" : `${classProgress.earned}/${classProgress.needed} CXP`}</strong>
+        </div>
+        <div class="xp-bar"><div class="xp-fill" style="width:${classProgress.pct}%"></div></div>
+        <p class="xp-text">${classProgress.atCap ? "Class mastery complete. Its earned passives remain active permanently." : "Win battles while using this class to earn Class XP."}</p>
+      </section>
+
+      <section class="card support-class-card">
+        <div class="jrpg-section-heading">
+          <div><h2>Battle Loadout</h2><p>Current-class skills plus learned skills from equipped support classes.</p></div>
+          <span>${supportSlots} support slot${supportSlots === 1 ? "" : "s"}</span>
+        </div>
+        ${supportSlots === 0
+          ? '<p class="xp-text">Support Class 1 unlocks at Character Level 5. A second support slot unlocks at Character Level 20.</p>'
+          : `<div class="support-class-grid">
+              ${Array.from({length:supportSlots}, (_,index) => `
+                <label>Support Class ${index + 1}
+                  <select class="support-class-select" data-support-index="${index}">
+                    ${supportOptions(selectedSupports[index] || "")}
+                  </select>
+                </label>`).join("")}
+            </div>
+            ${supportSlots < 2 ? '<p class="xp-text">Support Class 2 unlocks at Character Level 20.</p>' : ""}`}
       </section>
 
       <section class="character-quick-panels">
@@ -1751,30 +1831,21 @@ function renderClassScreen(kid) {
           </button>
         </div>
         <div id="gearQuickPanel" class="quick-panel-card" hidden>
-          <div class="jrpg-section-heading">
-            <div><h2>Current Gear</h2><p>Your equipped items at a glance.</p></div>
-          </div>
+          <div class="jrpg-section-heading"><div><h2>Current Gear</h2><p>Your equipped items at a glance.</p></div></div>
           <div class="loadout-grid">${renderEquippedLoadout(equipped)}</div>
         </div>
         <div id="companionQuickPanel" class="quick-panel-card" hidden>
-          <div class="jrpg-section-heading">
-            <div><h2>Companions</h2><p>Tamed allies provide special battle abilities and utility.</p></div>
-          </div>
+          <div class="jrpg-section-heading"><div><h2>Companions</h2><p>Tamed allies provide special battle abilities and utility.</p></div></div>
           ${renderActiveCompanions(kid)}
         </div>
       </section>
 
       <section class="card jrpg-menu-card attribute-overview-card">
-        <div class="jrpg-section-heading">
-          <div><h2>Attributes</h2><p>Level growth plus equipment bonuses.</p></div>
-        </div>
+        <div class="jrpg-section-heading"><div><h2>Attributes</h2><p>Character level, current class, permanent perks, and equipment.</p></div></div>
         <div class="attribute-overview">
           <div class="stat-radar-wrap">
             ${radarChartSvg(baseStats, stats)}
-            <div class="stat-radar-legend">
-              <span class="current">Base stats</span>
-              <span class="proposed">With gear</span>
-            </div>
+            <div class="stat-radar-legend"><span class="current">Without gear</span><span class="proposed">With gear</span></div>
           </div>
         </div>
         <div class="jrpg-stat-grid">${statRows}</div>
@@ -1782,67 +1853,106 @@ function renderClassScreen(kid) {
 
       <section class="card class-ability-card">
         <div class="jrpg-section-heading">
-          <div><h2>Abilities & Perks</h2><p>Your class grows into a different battle style as you level.</p></div>
+          <div><h2>${escapeHtml(def.name)} Rewards</h2><p>Every other class level earns something. Class Lv ${def.maxLevel} is the capstone.</p></div>
         </div>
-        <div class="class-perk-list">
-          ${perkCards.map(perk => `
-            <div class="class-perk-row">
-              <span>◆</span>
-              <div><small>${escapeHtml(perk.source)}</small><strong>${escapeHtml(perk.name)}</strong><p>${escapeHtml(perk.text)}</p></div>
-            </div>`).join("")}
+        <div class="class-reward-track">
+          ${rewardLevels.map(level => {
+            const text = def.rewards[level] || (level === def.maxLevel ? "Mastery" : "Class milestone");
+            const earned = classLevel >= level;
+            return `
+              <div class="class-reward-row ${earned ? "earned" : "locked"}">
+                <span class="class-reward-level">Lv ${level}</span>
+                <div><strong>${escapeHtml(String(text).split(" — ")[0])}</strong><small>${escapeHtml(text)}</small></div>
+                <span>${earned ? "✓" : "🔒"}</span>
+              </div>`;
+          }).join("")}
         </div>
+
+        <h3 class="class-subheading">Active skills available now</h3>
         <div class="class-skill-list">
-          ${unlocked.map(a => `
+          ${currentSkills.length ? currentSkills.map(skill => `
             <div class="class-skill-row unlocked">
-              <span class="class-skill-icon">${a.icon || "✨"}</span>
-              <div><strong>${escapeHtml(a.name)}</strong><span>Level ${a.level} • ${Number(a.cost || 0)} SP</span><small>${escapeHtml(a.text)}</small></div>
-            </div>`).join("")}
-          ${locked.map(a => `
-            <div class="class-skill-row locked">
-              <span class="class-skill-icon">🔒</span>
-              <div><strong>${escapeHtml(a.name)}</strong><span>Unlocks at Level ${a.level}</span><small>${escapeHtml(a.text)}</small></div>
-            </div>`).join("")}
+              <span class="class-skill-icon">${skill.icon || def.icon}</span>
+              <div><strong>${escapeHtml(skill.name)}</strong><span>Level ${skill.level} • ${Number(skill.cost || 0)} SP</span><small>${escapeHtml(skill.text)}</small></div>
+            </div>`).join("") : '<p class="xp-text">No active class skills unlocked yet.</p>'}
         </div>
+
+        <details class="earned-passive-details">
+          <summary>Permanent earned passives <strong>${globalPassives.length}</strong></summary>
+          <div class="class-perk-list">
+            ${globalPassives.length ? globalPassives.map(perk => `
+              <div class="class-perk-row">
+                <span>◆</span>
+                <div><small>${escapeHtml(CLASS_DEFINITIONS[perk.classId]?.name || "Class")} • Lv ${perk.level}</small><strong>${escapeHtml(perk.name)}</strong><p>${escapeHtml(perk.text)}</p></div>
+              </div>`).join("") : '<p class="xp-text">Level classes to earn permanent passive perks.</p>'}
+          </div>
+        </details>
+      </section>
+
+      <section class="card class-tree-section">
+        <div class="jrpg-section-heading">
+          <div><h2>Class Tree</h2><p>Reach prerequisite class levels to unlock new jobs. You can switch between unlocked classes at any time.</p></div>
+          <span>${learnedIds.length}/${CLASS_IDS.length} learned</span>
+        </div>
+        ${classTreeHtml}
       </section>
 
       <section class="card jrpg-menu-card">
         <div class="jrpg-section-heading">
-          <div>
-            <h2>Equipment</h2>
-            <p>Choose a slot, then select a compatible item.</p>
-          </div>
+          <div><h2>Equipment</h2><p>Choose a slot, then select a compatible item.</p></div>
           <span>${equippedGearCount}/${Object.keys(EQUIPMENT_SLOTS).length}</span>
         </div>
         <div class="equipment-slot-list">${equipmentRows}</div>
       </section>
 
       <section id="equipmentChooserHost" class="card equipment-chooser-host">
-        <div class="equipment-chooser-empty">
-          <span>☝️</span>
-          <p>Select an equipment slot above.</p>
-        </div>
+        <div class="equipment-chooser-empty"><span>☝️</span><p>Select an equipment slot above.</p></div>
       </section>
-
-      ${canChooseBranch1 ? `<section class="card"><h2>Choose Your Level 5 Path</h2>${def.branch1.map(b => `<button class="choose-branch1-btn" data-branch-id="${b.id}" type="button" style="width:100%;margin-bottom:10px;">${b.icon} ${escapeHtml(b.name)}</button>`).join("")}</section>` : ""}
-      ${canChooseBranch2 ? `<section class="card"><h2>Choose Your Level 10 Path</h2>${(def.branch2[kid.classBranch1] || []).map(b => `<button class="choose-branch2-btn" data-branch-id="${b.id}" type="button" style="width:100%;margin-bottom:10px;">🌟 ${escapeHtml(b.name)}</button>`).join("")}</section>` : ""}
 
       <button id="classScreenBackBtn" type="button" style="width:100%;">← Back</button>
     </main>`;
 
-  document.querySelectorAll(".choose-branch1-btn").forEach(button => button.addEventListener("click", async () => {
-    const branch = def.branch1.find(b => b.id === button.dataset.branchId);
-    if (!branch || !confirm(`Choose the ${branch.name} path?`)) return;
-    await updateDoc(doc(db, "kids", kid.kidId), { classBranch1: branch.id, classTitle: branch.name, classPath: `${def.name} → ${branch.name}` });
-    await loadClassScreen(kid.kidId);
-  }));
+  document.querySelectorAll(".switch-class-btn").forEach(button => {
+    button.addEventListener("click", async () => {
+      const classId = button.dataset.classId;
+      const classDef = CLASS_DEFINITIONS[classId];
+      if (!classDef || !classIsUnlocked(kid, classId)) return;
+      if (!confirm(`Switch to ${classDef.name}?`)) return;
 
-  document.querySelectorAll(".choose-branch2-btn").forEach(button => button.addEventListener("click", async () => {
-    const branch = (def.branch2[kid.classBranch1] || []).find(b => b.id === button.dataset.branchId);
-    if (!branch || !confirm(`Choose the ${branch.name} path?`)) return;
-    const first = def.branch1.find(b => b.id === kid.classBranch1)?.name || def.name;
-    await updateDoc(doc(db, "kids", kid.kidId), { classBranch2: branch.id, classTitle: branch.name, classPath: `${def.name} → ${first} → ${branch.name}` });
-    await loadClassScreen(kid.kidId);
-  }));
+      const classLevels = {...(kid.classLevels || {})};
+      const classXp = {...(kid.classXp || {})};
+      if (!Number(classLevels[classId] || 0)) {
+        classLevels[classId] = 1;
+        classXp[classId] = Number(classXp[classId] || 0);
+      }
+      const supportClasses = (Array.isArray(kid.supportClasses) ? kid.supportClasses : [])
+        .filter(id => id !== classId)
+        .slice(0, supportSlotCount(kid));
+
+      await updateDoc(doc(db, "kids", kid.kidId), {
+        classId,
+        classTitle: classDef.name,
+        classPath: classDef.name,
+        classLevels,
+        classXp,
+        supportClasses,
+        classChosenAt: new Date().toISOString()
+      });
+      await loadClassScreen(kid.kidId);
+    });
+  });
+
+  document.querySelectorAll(".support-class-select").forEach(select => {
+    select.addEventListener("change", async () => {
+      const ordered = Array.from(document.querySelectorAll(".support-class-select"))
+        .map(input => input.value)
+        .filter(Boolean)
+        .filter((id, index, arr) => id !== kid.classId && arr.indexOf(id) === index)
+        .slice(0, supportSlots);
+      await updateDoc(doc(db, "kids", kid.kidId), {supportClasses: ordered});
+      await loadClassScreen(kid.kidId);
+    });
+  });
 
   const chooserHost = document.getElementById("equipmentChooserHost");
 
@@ -1855,8 +1965,8 @@ function renderClassScreen(kid) {
     const renderChooser = () => {
       let proposedStats = null;
       if (selectedItem) {
-        const proposedEquipment = { ...equipped, [slot]: selectedItem };
-        proposedStats = getClassStats({ ...kid, equipment: proposedEquipment });
+        const proposedEquipment = {...equipped, [slot]: selectedItem};
+        proposedStats = getClassStats({...kid, equipment: proposedEquipment});
       }
 
       chooserHost.innerHTML = `
@@ -1864,36 +1974,25 @@ function renderClassScreen(kid) {
           <div><h2>${escapeHtml(slotLabel)}</h2><p>${matchingItems.length} compatible item${matchingItems.length === 1 ? "" : "s"} available.</p></div>
           <button id="closeEquipmentChooserBtn" class="equipment-close-btn" type="button">✕</button>
         </div>
-
         ${currentItem ? `
           <div class="equipment-current-item">
             <span class="equipment-slot-icon">${itemIcon(currentItem)}</span>
             <div><small>Currently equipped</small><strong>${escapeHtml(displayItemName(currentItem))}</strong><span>${escapeHtml(formatBonuses(currentItem))}</span></div>
             <button id="removeEquipmentBtn" type="button">Remove</button>
           </div>` : '<p class="equipment-none-equipped">Nothing is currently equipped in this slot.</p>'}
-
         <div class="equipment-preview-card ${selectedItem ? "active" : ""}">
           <div class="equipment-preview-heading">
-            <div>
-              <small>${selectedItem ? "Previewing" : "Equipment comparison"}</small>
-              <strong>${selectedItem ? escapeHtml(displayItemName(selectedItem)) : "Choose an item below"}</strong>
-            </div>
+            <div><small>${selectedItem ? "Previewing" : "Equipment comparison"}</small><strong>${selectedItem ? escapeHtml(displayItemName(selectedItem)) : "Choose an item below"}</strong></div>
             ${selectedItem ? '<button id="confirmEquipBtn" type="button">Equip Selected</button>' : ""}
           </div>
           <div class="equipment-preview-grid">
             <div class="stat-radar-wrap">
               ${radarChartSvg(stats, proposedStats)}
-              <div class="stat-radar-legend">
-                <span class="current">Current</span>
-                ${selectedItem ? '<span class="proposed">With item</span>' : ""}
-              </div>
+              <div class="stat-radar-legend"><span class="current">Current</span>${selectedItem ? '<span class="proposed">With item</span>' : ""}</div>
             </div>
-            <div class="stat-number-list">
-              ${statComparisonTableHtml(stats, proposedStats)}
-            </div>
+            <div class="stat-number-list">${statComparisonTableHtml(stats, proposedStats)}</div>
           </div>
         </div>
-
         <div class="equipment-choice-list">
           ${matchingItems.length ? matchingItems.map(item => {
             const grade = ITEM_GRADES[normalizeRarity(item.rarity || item.grade)];
@@ -1901,19 +2000,13 @@ function renderClassScreen(kid) {
             return `
               <button class="equipment-choice-row ${isSelected ? "selected" : ""}" type="button" data-item-id="${escapeAttribute(item.instanceId)}">
                 <span class="equipment-slot-icon" style="border-color:${grade.color};box-shadow:0 0 14px ${grade.glow};">${itemIcon(item)}</span>
-                <span class="equipment-choice-copy">
-                  <strong>${escapeHtml(displayItemName(item))}</strong>
-                  <small>${grade.name} • ${escapeHtml(formatBonuses(item))}</small>
-                  <span class="equipment-delta-list">${equipmentComparisonHtml(item, currentItem)}</span>
-                </span>
+                <span class="equipment-choice-copy"><strong>${escapeHtml(displayItemName(item))}</strong><small>${grade.name} • ${escapeHtml(formatBonuses(item))}</small><span class="equipment-delta-list">${equipmentComparisonHtml(item, currentItem)}</span></span>
                 <span class="equipment-choice-action">${isSelected ? "Selected" : "Preview"}</span>
               </button>`;
           }).join("") : '<div class="equipment-chooser-empty"><span>🎒</span><p>No compatible items are in the inventory yet.</p></div>'}
         </div>`;
 
-      document.querySelectorAll(".equipment-slot-row").forEach(row => {
-        row.classList.toggle("selected", row.dataset.equipmentSlot === slot);
-      });
+      document.querySelectorAll(".equipment-slot-row").forEach(row => row.classList.toggle("selected", row.dataset.equipmentSlot === slot));
 
       document.getElementById("closeEquipmentChooserBtn")?.addEventListener("click", () => {
         chooserHost.innerHTML = '<div class="equipment-chooser-empty"><span>☝️</span><p>Select an equipment slot above.</p></div>';
@@ -1921,10 +2014,10 @@ function renderClassScreen(kid) {
       });
 
       document.getElementById("removeEquipmentBtn")?.addEventListener("click", async () => {
-        const nextEquipment = { ...equipped };
+        const nextEquipment = {...equipped};
         delete nextEquipment[slot];
         await updateDoc(doc(db, "kids", kid.kidId), {
-          inventory: [...inventory, { ...currentItem, equipped: false }],
+          inventory: [...inventory, {...currentItem, equipped:false}],
           equipment: nextEquipment
         });
         await loadClassScreen(kid.kidId);
@@ -1940,17 +2033,18 @@ function renderClassScreen(kid) {
       document.getElementById("confirmEquipBtn")?.addEventListener("click", async () => {
         if (!selectedItem) return;
         const nextInventory = inventory.filter(entry => entry.instanceId !== selectedItem.instanceId);
-        const nextEquipment = { ...equipped };
-        if (nextEquipment[slot]) nextInventory.push({ ...nextEquipment[slot], equipped: false });
-        nextEquipment[slot] = { ...selectedItem, equipped: true };
-        await updateDoc(doc(db, "kids", kid.kidId), { inventory: nextInventory, equipment: nextEquipment });
+        const nextEquipment = {...equipped};
+        if (nextEquipment[slot]) nextInventory.push({...nextEquipment[slot], equipped:false});
+        nextEquipment[slot] = {...selectedItem, equipped:true};
+        await updateDoc(doc(db, "kids", kid.kidId), {inventory:nextInventory, equipment:nextEquipment});
         await loadClassScreen(kid.kidId);
       });
     };
 
     renderChooser();
-    chooserHost.scrollIntoView({ behavior: "smooth", block: "start" });
+    chooserHost.scrollIntoView({behavior:"smooth", block:"start"});
   };
+
   document.querySelectorAll(".quick-panel-btn").forEach(button => {
     button.addEventListener("click", () => {
       const targetId = button.dataset.panelTarget;
@@ -1969,175 +2063,10 @@ function renderClassScreen(kid) {
   });
 
   document.querySelectorAll(".loadout-slot").forEach(button => {
-    button.addEventListener("click", () => {
-      openEquipmentChooser(button.dataset.loadoutSlot);
-      document.getElementById("equipmentChooserHost")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+    button.addEventListener("click", () => openEquipmentChooser(button.dataset.loadoutSlot));
   });
 
   document.getElementById("classScreenBackBtn").addEventListener("click", () => loadKidDashboard(kid.kidId));
-}
-
-function scheduledDescendantsForQuest(parentQuestId, allQuests, date = new Date()) {
-  const result = [];
-  const walk = parentId => {
-    allQuests.filter(item => item.parentQuestId === parentId).forEach(child => {
-      if (child.archived !== true && child.active !== false && isQuestScheduledToday(child, date)) {
-        result.push(child);
-      }
-      walk(child.choreId);
-    });
-  };
-  walk(parentQuestId);
-  return result;
-}
-
-function parentQuestRequirements(quest, allQuests) {
-  const dueChildren = scheduledDescendantsForQuest(quest.choreId, allQuests);
-  const incomplete = dueChildren.filter(child => !child.completedToday);
-  return { dueChildren, incomplete };
-}
-
-function questCard(quest, currentKidId) {
-  const isMain = quest.kidId === currentKidId;
-  const isSubtask = Boolean(quest.parentQuestId);
-  const locked = !quest.completedToday && !quest.pendingByCurrentKid && Boolean(quest.isLockedBySubtasks);
-  const rewardText = isSubtask
-    ? "Reward is bundled with the parent task"
-    : quest.dueChildCount
-      ? `Includes this task + ${quest.dueChildCount} due subtask reward${quest.dueChildCount === 1 ? "" : "s"}`
-      : "Adventure food on approval";
-
-  let statusText = isMain ? "Your responsibility" : quest.kidId === ANYONE_ID ? "Available to anyone" : "Help another adventurer";
-  if (quest.completedToday) statusText = "Completed for this schedule";
-  else if (quest.pendingByCurrentKid) statusText = "Your claim is awaiting approval";
-  else if (locked) statusText = `Finish ${quest.incompleteChildCount} due subtask${quest.incompleteChildCount === 1 ? "" : "s"} first`;
-
-  return `
-    <div class="quest ${isSubtask ? "quest-subtask" : ""} ${locked ? "quest-locked" : ""}">
-      <div class="quest-icon">${quest.completedToday ? "✅" : locked ? "🔒" : iconForQuest(quest.name || "")}</div>
-      <div class="quest-info">
-        <strong>${escapeHtml(quest.name || "Unnamed Quest")}</strong>
-        <span>${escapeHtml(scheduleLabel(quest))} • ${escapeHtml(dueLabel(quest))} • ${escapeHtml(rewardText)}${isMain ? "" : " • helper snack"}</span>
-        <small class="status ${quest.completedToday ? "status-approved" : quest.pendingByCurrentKid ? "status-pending" : "status-ready"}">${escapeHtml(statusText)}</small>
-      </div>
-      ${quest.completedToday
-        ? '<button class="approved" disabled>Done</button>'
-        : quest.pendingByCurrentKid
-          ? '<button class="disabled" disabled>Claimed</button>'
-          : locked
-            ? '<button class="disabled" disabled>Locked</button>'
-            : `<button class="complete-btn" type="button" data-chore-id="${escapeAttribute(quest.choreId)}">Complete</button>`}
-    </div>`;
-}
-
-async function openQuestSubmission(choreId, currentKidId, allKids) {
-  setAppTheme("kid");
-  try {
-    const questSnap = await getDoc(doc(db, "quests", choreId));
-    if (!questSnap.exists()) { alert("Quest not found."); return; }
-    const quest = { choreId, ...questSnap.data() };
-    const [allQuestSnap, history] = await Promise.all([
-      getDocs(collection(db, "quests")),
-      getAllHistory()
-    ]);
-    const scheduled = [];
-    allQuestSnap.forEach(item => {
-      const candidate = { choreId: item.id, ...item.data() };
-      if (candidate.archived === true || candidate.active === false || !isQuestScheduledToday(candidate)) return;
-      candidate.completedToday = isQuestCompletedForCurrentPeriod(candidate, history);
-      scheduled.push(candidate);
-    });
-    const required = scheduledDescendantsForQuest(choreId, scheduled);
-    const incomplete = required.filter(item => !item.completedToday);
-    if (incomplete.length) {
-      alert(`Finish today's subtasks first: ${incomplete.map(item => item.name || "Subtask").join(", ")}`);
-      await loadKidDashboard(currentKidId);
-      return;
-    }
-    const helpersAllowed = quest.allowHelpers !== false;
-    document.body.innerHTML = `
-      <main class="app">
-        <header class="hero compact"><div class="logo">🤝</div><h1>${escapeHtml(quest.name || "Quest")}</h1><p>Who worked on this quest?</p></header>
-        <section class="card form-card">
-          <label style="display:flex;align-items:center;gap:10px;"><input type="checkbox" checked disabled> ${escapeHtml(allKids.find(k => k.kidId === currentKidId)?.name || currentKidId)} (you)</label>
-          ${helpersAllowed ? allKids.filter(k => k.kidId !== currentKidId).map(k => `<label style="display:flex;align-items:center;gap:10px;"><input class="helper-checkbox" type="checkbox" value="${escapeAttribute(k.kidId)}"> ${escapeHtml(k.name || k.kidId)}</label>`).join("") : '<p>This quest does not allow helpers.</p>'}
-          <button id="submitQuestBtn" type="button">Submit for Approval</button>
-          <button id="cancelSubmissionBtn" type="button">Cancel</button>
-        </section>
-      </main>`;
-
-    document.getElementById("submitQuestBtn").addEventListener("click", async () => {
-      const participantIds = [currentKidId, ...Array.from(document.querySelectorAll(".helper-checkbox:checked")).map(i => i.value)];
-      const today = getTodayKey();
-      const existing = await getTodaySubmissions();
-      if (existing.some(s => s.questId === choreId && s.status === "Pending" && Array.isArray(s.participantIds) && s.participantIds.includes(currentKidId))) {
-        alert("You already have a pending claim for this quest.");
-        await loadKidDashboard(currentKidId);
-        return;
-      }
-      await addDoc(collection(db, "questSubmissions"), {
-        questId: choreId,
-        questName: quest.name || "Unnamed Quest",
-        assignedKidId: quest.kidId || ANYONE_ID,
-        submittedBy: currentKidId,
-        participantIds,
-        status: "Pending",
-        questDate: today,
-        periodKey: getQuestPeriodKey(quest),
-        scheduleType: getQuestScheduleType(quest),
-        submittedAt: new Date().toISOString(),
-        isSideQuest: quest.kidId !== currentKidId,
-        foodTier: questFoodTier(quest)
-      });
-      showToast(getCompletionMessage());
-      setTimeout(() => loadKidDashboard(currentKidId), 600);
-    });
-    document.getElementById("cancelSubmissionBtn").addEventListener("click", () => loadKidDashboard(currentKidId));
-  } catch (err) {
-    showError("Could not submit quest: " + err.message);
-  }
-}
-
-
-function statusLabel(status) {
-  if (!status) return "Ready";
-  if (status === "Not Started") return "Ready";
-  if (status === "Available" || status === "available") return "Ready";
-  if (status === "Pending") return "Awaiting approval";
-  if (status === "Approved") return "Completed";
-  if (status === "Rejected") return "Rejected";
-  if (status === "Archived") return "Archived";
-  return String(status);
-}
-
-function statusClass(status) {
-  if (status === "Pending") return "status-pending";
-  if (status === "Approved") return "status-approved";
-  if (status === "Rejected") return "status-rejected";
-  return "status-ready";
-}
-
-function iconForQuest(name) {
-  const lower = String(name || "").toLowerCase();
-  if (lower.includes("zeus") || lower.includes("dog")) return "🐕";
-  if (lower.includes("cat")) return "🐈";
-  if (lower.includes("dish")) return "🍽️";
-  if (lower.includes("litter") || lower.includes("sweep")) return "🧹";
-  if (lower.includes("garbage") || lower.includes("trash")) return "🗑️";
-  if (lower.includes("vacuum")) return "🧽";
-  if (lower.includes("laundry")) return "🧺";
-  if (lower.includes("room") || lower.includes("toy")) return "🧸";
-  return "📜";
-}
-
-function getCompletionMessage() {
-  const kidName = document.querySelector("h1")?.textContent || "";
-  if (kidName === "Autumn") return "✨ Quest submitted with sparkles!";
-  if (kidName === "Cammron") return "🥊 Quest punched into review!";
-  if (kidName === "Ava") return "🦄 Quest sent with unicorn magic!";
-  if (kidName === "Wesley") return "🐉 Quest sent with dragon fire!";
-  return "Quest submitted for approval!";
 }
 
 function showToast(message) {
