@@ -551,6 +551,7 @@ function initializeAuthRouter() {
   onAuthStateChanged(auth, async user => {
     const isManager = params.get("manager") === "true";
     const isFamily = params.get("family") === "true";
+    const isMod = params.get("mod") === "true";
 
     if (!user) {
       await loadUserDashboard(null);
@@ -584,7 +585,13 @@ function initializeAuthRouter() {
   return;
 }
 
-    if (isManager) {
+    if (isMod) {
+      if (String(user?.email || "").toLowerCase() === ADMIN_EMAIL) {
+        await loadModLab(user);
+      } else {
+        await loadParentDashboard(user);
+      }
+    } else if (isManager) {
       await loadQuestManager(user);
     } else if (isFamily) {
       await loadFamilyAccounts(user);
@@ -1955,6 +1962,279 @@ async function resetDailyQuestsIfNeeded() {
 }
 
 /* -------------------------------------------------
+   ADVENTURES AND GUILDMASTER TEST LAB
+------------------------------------------------- */
+
+async function loadAdventureScreen(kidId) {
+  try {
+    const kidSnap = await getDoc(doc(db, "kids", kidId));
+    if (!kidSnap.exists()) { showError("Adventurer not found."); return; }
+    let kid = { kidId, ...kidSnap.data() };
+    kid = await ensureInventoryInitialized(kid);
+    const stats = kid.classId && CLASS_DEFINITIONS[kid.classId] ? getClassStats(kid) : null;
+    const energy = Math.min(MAX_ENERGY, Number(kid.energy ?? MAX_ENERGY));
+    const sleepy = currentSleepiness(kid);
+    const adventures = [
+      { id: "forest", name: "Whispering Woods", icon: "🌲", energy: 5, sleep: 1, note: "A short hunt with modest rewards." },
+      { id: "ruins", name: "Old Ruins", icon: "🏚️", energy: 8, sleep: 2, note: "Tougher enemies and better treasure." },
+      { id: "vault", name: "Arcane Vault", icon: "🔮", energy: 12, sleep: 3, note: "A dangerous run with the best current rewards." }
+    ];
+
+    document.body.innerHTML = `
+      <main class="app">
+        <header class="hero compact"><div class="logo">🗺️</div><h1>Adventure</h1><p>${escapeHtml(kid.name || kidId)} • choose an expedition</p></header>
+        <section class="card adventure-resource-card">
+          <div class="adventure-resource-head">
+            <div><span>⚡ Energy</span><strong>${energy} / ${MAX_ENERGY}</strong></div>
+            <div><span>😴 Sleepiness</span><strong>${sleepy} / ${MAX_SLEEPINESS}</strong></div>
+          </div>
+          ${stats ? `<p class="xp-text">Battle rating uses your level, class attributes, and equipped gear.</p>` : ""}
+        </section>
+        <section class="adventure-list">
+          ${adventures.map(adventure => {
+            const unavailable = energy < adventure.energy || sleepy + adventure.sleep > MAX_SLEEPINESS;
+            return `
+              <button class="adventure-option" type="button" data-adventure-id="${adventure.id}" ${unavailable ? "disabled" : ""}>
+                <span class="adventure-icon">${adventure.icon}</span>
+                <span class="adventure-copy">
+                  <strong>${adventure.name}</strong>
+                  <small>${adventure.note}</small>
+                  <span>⚡ ${adventure.energy} Energy • 😴 +${adventure.sleep}</span>
+                </span>
+                <span class="equipment-slot-arrow">›</span>
+              </button>`;
+          }).join("")}
+        </section>
+        ${sleepy >= MAX_SLEEPINESS ? '<section class="card"><p>😴 Too sleepy to adventure again today. Sleepiness resets tomorrow.</p></section>' : ""}
+        <button id="adventureBackBtn" type="button" style="width:100%;margin-top:12px;">← Back to Quests</button>
+      </main>`;
+
+    document.querySelectorAll(".adventure-option").forEach(button => {
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        try {
+          const result = await runAdventureCall({ kidId, adventureId: button.dataset.adventureId });
+          const data = result?.data || {};
+          if (data.won) {
+            alert(`Victory! +${Number(data.xp || 0)} XP and +${Number(data.gold || 0)} Gold.`);
+          } else {
+            alert("The enemy got the better of you this time. Rest, gear up, and try again.");
+          }
+          await loadAdventureScreen(kidId);
+        } catch (err) {
+          alert(err?.message || "Adventure could not start.");
+          button.disabled = false;
+        }
+      });
+    });
+    document.getElementById("adventureBackBtn")?.addEventListener("click", () => loadKidDashboard(kidId));
+  } catch (err) {
+    showError("Could not load adventure: " + err.message);
+  }
+}
+
+const MOD_PROFILE_ID = "MODLAB";
+
+async function ensureModProfile() {
+  const ref = doc(db, "kids", MOD_PROFILE_ID);
+  const snap = await getDoc(ref);
+  if (snap.exists()) return { kidId: MOD_PROFILE_ID, ...snap.data() };
+
+  const data = {
+    name: "Guildmaster Test Adventurer",
+    avatar: "🧪",
+    active: false,
+    classId: "warrior",
+    classTitle: "Warrior",
+    classPath: "Warrior",
+    level: 1,
+    xp: 0,
+    gold: 0,
+    sp: 10,
+    energy: MAX_ENERGY,
+    sleepiness: 0,
+    sleepinessDate: getTodayKey(),
+    currentStreak: 0,
+    bestStreak: 0,
+    inventory: [],
+    equipment: {},
+    inventoryVersion: INVENTORY_VERSION,
+    foodInventory: {
+      gummy_bears: 10,
+      chocolate_bar: 10,
+      lollipop: 10,
+      streak_bubble_gum: 3
+    },
+    modProfile: true
+  };
+  await setDoc(ref, data);
+  return { kidId: MOD_PROFILE_ID, ...data };
+}
+
+async function loadModLab(user) {
+  if (String(user?.email || "").toLowerCase() !== ADMIN_EMAIL) {
+    await loadParentDashboard(user);
+    return;
+  }
+
+  try {
+    let kid = await ensureModProfile();
+    kid = await ensureInventoryInitialized(kid);
+    const stats = getClassStats(kid);
+    const rarityOptions = Object.keys(ITEM_GRADES);
+    const slotEditors = Object.entries(EQUIPMENT_SLOTS).filter(([slot]) => slot !== "companion").map(([slot, label]) => {
+      const compatible = Object.entries(ITEM_TYPES).filter(([, item]) => item.slot === slot);
+      const equippedItem = kid.equipment?.[slot] || null;
+      return `
+        <div class="mod-gear-row">
+          <div><small>${escapeHtml(label)}</small><strong>${escapeHtml(displayItemName(equippedItem))}</strong></div>
+          <select class="mod-item-select" data-slot="${slot}">
+            <option value="">Empty</option>
+            ${compatible.map(([id, item]) => `<option value="${escapeAttribute(id)}" ${equippedItem?.itemType === id ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
+          </select>
+          <select class="mod-rarity-select" data-slot="${slot}">
+            ${rarityOptions.map(rarity => `<option value="${rarity}" ${normalizeRarity(equippedItem?.rarity || equippedItem?.grade) === rarity ? "selected" : ""}>${ITEM_GRADES[rarity].name}</option>`).join("")}
+          </select>
+        </div>`;
+    }).join("");
+
+    document.body.innerHTML = `
+      <main class="app">
+        ${renderSignOutHeader(user)}
+        <header class="hero compact"><div class="logo">🧪</div><h1>Guildmaster Test Lab</h1><p>Private mod adventurer for testing real progression systems.</p></header>
+
+        <section class="card mod-warning">
+          <strong>God Mode</strong>
+          <p>This inactive test profile is hidden from child character selection and is only linked from your Guild Hall account.</p>
+        </section>
+
+        <section class="card">
+          <h2>Progression</h2>
+          <div class="mod-control-grid">
+            <label>Class
+              <select id="modClassSelect">
+                ${Object.entries(CLASS_DEFINITIONS).map(([id, def]) => `<option value="${id}" ${kid.classId === id ? "selected" : ""}>${escapeHtml(def.name)}</option>`).join("")}
+              </select>
+            </label>
+            <label>Level
+              <input id="modLevelInput" type="number" min="1" max="100" value="${Math.max(1, Number(kid.level || 1))}">
+            </label>
+            <label>Energy
+              <input id="modEnergyInput" type="number" min="0" max="${MAX_ENERGY}" value="${Math.min(MAX_ENERGY, Number(kid.energy ?? MAX_ENERGY))}">
+            </label>
+            <label>Sleepiness
+              <input id="modSleepInput" type="number" min="0" max="${MAX_SLEEPINESS}" value="${currentSleepiness(kid)}">
+            </label>
+            <label>SP
+              <input id="modSpInput" type="number" min="0" max="999" value="${Number(kid.sp || 0)}">
+            </label>
+            <label>Gold
+              <input id="modGoldInput" type="number" min="0" max="999999" value="${Number(kid.gold || 0)}">
+            </label>
+          </div>
+          <button id="saveModProgressBtn" type="button" style="width:100%;margin-top:12px;">Save Progression</button>
+        </section>
+
+        <section class="card jrpg-menu-card">
+          <div class="jrpg-section-heading"><div><h2>Derived Attributes</h2><p>These are calculated from class, level, and equipment.</p></div></div>
+          <div class="attribute-overview"><div class="stat-radar-wrap">${radarChartSvg(stats)}</div></div>
+          <div class="jrpg-stat-grid">
+            ${STAT_KEYS.map(key => `<div class="jrpg-stat-row"><span>${statAbbreviation(key)}</span><strong>${Number(stats[key] || 0)}</strong></div>`).join("")}
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>God-Mode Equipment</h2>
+          <p class="xp-text">Pick any compatible item and rarity. Stats update from the selected gear.</p>
+          <div class="mod-gear-list">${slotEditors}</div>
+          <button id="saveModGearBtn" type="button" style="width:100%;margin-top:12px;">Apply Equipment</button>
+        </section>
+
+        <section class="card">
+          <h2>Testing Shortcuts</h2>
+          <div class="mod-shortcuts">
+            <button id="modRefillBtn" type="button">⚡ Refill Energy</button>
+            <button id="modWakeBtn" type="button">😴 Reset Sleepiness</button>
+            <button id="modFoodsBtn" type="button">🍬 Add Test Food</button>
+            <button id="modAdventureBtn" type="button">🗺️ Open Adventure</button>
+            <button id="modCharacterBtn" type="button">🧙 Open Character Sheet</button>
+          </div>
+        </section>
+
+        <button id="modBackBtn" type="button" style="width:100%;">← Back to Guild Hall</button>
+      </main>`;
+
+    attachSignOutEvent();
+
+    document.getElementById("saveModProgressBtn").addEventListener("click", async () => {
+      const classId = document.getElementById("modClassSelect").value;
+      const def = CLASS_DEFINITIONS[classId];
+      const level = Math.max(1, Math.min(100, Number(document.getElementById("modLevelInput").value || 1)));
+      await updateDoc(doc(db, "kids", MOD_PROFILE_ID), {
+        classId,
+        classTitle: def.name,
+        classPath: def.name,
+        classBranch1: "",
+        classBranch2: "",
+        level,
+        xp: (level - 1) * 100,
+        energy: Math.max(0, Math.min(MAX_ENERGY, Number(document.getElementById("modEnergyInput").value || 0))),
+        sleepiness: Math.max(0, Math.min(MAX_SLEEPINESS, Number(document.getElementById("modSleepInput").value || 0))),
+        sleepinessDate: getTodayKey(),
+        sp: Math.max(0, Number(document.getElementById("modSpInput").value || 0)),
+        gold: Math.max(0, Number(document.getElementById("modGoldInput").value || 0))
+      });
+      await loadModLab(user);
+    });
+
+    document.getElementById("saveModGearBtn").addEventListener("click", async () => {
+      const equipment = {};
+      document.querySelectorAll(".mod-item-select").forEach(select => {
+        const slot = select.dataset.slot;
+        const itemType = select.value;
+        if (!itemType) return;
+        const raritySelect = document.querySelector(`.mod-rarity-select[data-slot="${slot}"]`);
+        const rarity = raritySelect?.value || "common";
+        equipment[slot] = { ...createItem(itemType, rarity), equipped: true };
+      });
+      await updateDoc(doc(db, "kids", MOD_PROFILE_ID), { equipment });
+      await loadModLab(user);
+    });
+
+    document.getElementById("modRefillBtn").addEventListener("click", async () => {
+      await updateDoc(doc(db, "kids", MOD_PROFILE_ID), { energy: MAX_ENERGY });
+      await loadModLab(user);
+    });
+    document.getElementById("modWakeBtn").addEventListener("click", async () => {
+      await updateDoc(doc(db, "kids", MOD_PROFILE_ID), { sleepiness: 0, sleepinessDate: getTodayKey() });
+      await loadModLab(user);
+    });
+    document.getElementById("modFoodsBtn").addEventListener("click", async () => {
+      const snap = await getDoc(doc(db, "kids", MOD_PROFILE_ID));
+      const existing = snap.data()?.foodInventory || {};
+      await updateDoc(doc(db, "kids", MOD_PROFILE_ID), {
+        foodInventory: {
+          ...existing,
+          gummy_bears: Number(existing.gummy_bears || 0) + 5,
+          chocolate_bar: Number(existing.chocolate_bar || 0) + 5,
+          lollipop: Number(existing.lollipop || 0) + 5,
+          streak_bubble_gum: Number(existing.streak_bubble_gum || 0) + 1
+        }
+      });
+      await loadModLab(user);
+    });
+    document.getElementById("modAdventureBtn").addEventListener("click", () => loadAdventureScreen(MOD_PROFILE_ID));
+    document.getElementById("modCharacterBtn").addEventListener("click", () => loadClassScreen(MOD_PROFILE_ID));
+    document.getElementById("modBackBtn").addEventListener("click", () => {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      loadParentDashboard(user);
+    });
+  } catch (err) {
+    showError("Could not load mod lab: " + err.message);
+  }
+}
+
+/* -------------------------------------------------
    PARENT DASHBOARD, SUBMISSION APPROVAL, AND CHILD DETAILS
 ------------------------------------------------- */
 
@@ -2012,6 +2292,11 @@ function renderParentDashboard(data, user) {
 
       <section class="card">
         <h2>Adventurers</h2>
+        ${isGuildMaster ? `
+          <a class="mod-adventurer-card" href="?mod=true">
+            <div class="avatar">🧪</div>
+            <div><strong>Guildmaster Test Adventurer</strong><span>God-mode testing • level, gear, energy, sleepiness</span></div>
+          </a>` : ""}
         ${data.kids.map(kid => {
           const main = data.quests.filter(q => q.kidId === kid.kidId);
           const doneIds = new Set(data.history.filter(h => Array.isArray(h.participantIds) && h.participantIds.includes(kid.kidId)).map(h => h.questId));
