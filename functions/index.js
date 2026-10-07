@@ -536,8 +536,6 @@ const startBattleHandler = async (request) => {
         `Battle could not start: ${err?.message || "unknown error"}`,
     );
   }
-});
-
 };
 
 exports.startBattle = onCall({maxInstances: 3, invoker: "public"}, startBattleHandler);
@@ -654,7 +652,6 @@ const battleActionHandler = async (request) => {
   });
 
   return result;
-});
 };
 
 exports.battleAction = onCall({maxInstances: 3, invoker: "public"}, battleActionHandler);
