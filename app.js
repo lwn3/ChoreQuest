@@ -1,4 +1,21 @@
 import "./firebase.js?v=20260802-2105";
+import {
+  CLASS_DEFINITIONS,
+  CLASS_IDS,
+  classLevelFor,
+  classXpFor,
+  classXpNeededForLevel,
+  classLevelFromXp,
+  classRequirementText,
+  classIsUnlocked,
+  classIsVisible,
+  learnedClassIds,
+  supportSlotCount,
+  learnedActiveSkills,
+  earnedPassivePerks,
+  aggregatePassivePerks,
+  classXpRewardMultiplier
+} from "./class-system.js?v=20261007-1";
 
 const {
   db,
@@ -140,105 +157,6 @@ function setAppTheme(mode = "default") {
 /* -------------------------------------------------
    CLASS SYSTEM FOUNDATION
 ------------------------------------------------- */
-
-const CLASS_DEFINITIONS = {
-  warrior: {
-    name: "Warrior", icon: "⚔️", description: "Brave, strong, and dependable.",
-    base: { strength: 8, wisdom: 3, agility: 5, kindness: 4, luck: 3, courage: 8 },
-    growth: { strength: 2, wisdom: 0, agility: 1, kindness: 0, luck: 0, courage: 1 },
-    abilities: [
-      { level: 1, name: "Brave Start", text: "A warrior begins every quest with courage." },
-      { level: 5, name: "Iron Will", text: "A badge of determination earned at Level 5." },
-      { level: 10, name: "Guardian Strike", text: "An advanced warrior title and effect." },
-      { level: 15, name: "Champion's Resolve", text: "The mark of a true champion." }
-    ],
-    branch1: [{ id: "knight", name: "Knight", icon: "🛡️" }, { id: "berserker", name: "Berserker", icon: "🪓" }],
-    branch2: {
-      knight: [{ id: "paladin", name: "Paladin" }, { id: "dragon-knight", name: "Dragon Knight" }],
-      berserker: [{ id: "champion", name: "Champion" }, { id: "warlord", name: "Warlord" }]
-    }
-  },
-  rogue: {
-    name: "Rogue", icon: "🗡️", description: "Quick, clever, and independent.",
-    base: { strength: 4, wisdom: 4, agility: 9, kindness: 3, luck: 7, courage: 5 },
-    growth: { strength: 0, wisdom: 0, agility: 2, kindness: 0, luck: 1, courage: 1 },
-    abilities: [
-      { level: 1, name: "Quick Step", text: "A nimble beginning for every adventure." },
-      { level: 5, name: "Clever Hands", text: "Unlocks a special rogue badge." },
-      { level: 10, name: "Shadow Dash", text: "An advanced speed-themed effect." },
-      { level: 15, name: "Master of Fortune", text: "The ultimate rogue title." }
-    ],
-    branch1: [{ id: "scout", name: "Scout", icon: "👣" }, { id: "trickster", name: "Trickster", icon: "🎭" }],
-    branch2: {
-      scout: [{ id: "pathfinder", name: "Pathfinder" }, { id: "shadow-runner", name: "Shadow Runner" }],
-      trickster: [{ id: "illusion-rogue", name: "Illusion Rogue" }, { id: "fortune-master", name: "Fortune Master" }]
-    }
-  },
-  mage: {
-    name: "Mage", icon: "🧙", description: "Wise, creative, and full of magic.",
-    base: { strength: 2, wisdom: 10, agility: 4, kindness: 5, luck: 6, courage: 4 },
-    growth: { strength: 0, wisdom: 2, agility: 0, kindness: 0, luck: 1, courage: 1 },
-    abilities: [
-      { level: 1, name: "Spark", text: "A tiny magical spark follows completed quests." },
-      { level: 5, name: "Wisdom Aura", text: "A glowing badge of knowledge." },
-      { level: 10, name: "Enchanted Helper", text: "A teamwork-themed magical title." },
-      { level: 15, name: "Arcane Mastery", text: "The mark of a master spellcaster." }
-    ],
-    branch1: [{ id: "elementalist", name: "Elementalist", icon: "🔥" }, { id: "enchanter", name: "Enchanter", icon: "✨" }],
-    branch2: {
-      elementalist: [{ id: "fire-mage", name: "Fire Mage" }, { id: "frost-mage", name: "Frost Mage" }],
-      enchanter: [{ id: "illusionist", name: "Illusionist" }, { id: "rune-master", name: "Rune Master" }]
-    }
-  },
-  ranger: {
-    name: "Ranger", icon: "🏹", description: "An animal friend and outdoor adventurer.",
-    base: { strength: 5, wisdom: 5, agility: 8, kindness: 7, luck: 4, courage: 5 },
-    growth: { strength: 0, wisdom: 1, agility: 2, kindness: 1, luck: 0, courage: 0 },
-    abilities: [
-      { level: 1, name: "Animal Friend", text: "A companion-themed starting badge." },
-      { level: 5, name: "Trail Sense", text: "Shows a ranger's growing awareness." },
-      { level: 10, name: "Companion Call", text: "Unlocks an advanced companion title." },
-      { level: 15, name: "Wild Guardian", text: "The final ranger mastery title." }
-    ],
-    branch1: [{ id: "beast-friend", name: "Beast Friend", icon: "🐾" }, { id: "pathfinder", name: "Pathfinder", icon: "🧭" }],
-    branch2: {
-      "beast-friend": [{ id: "beast-master", name: "Beast Master" }, { id: "spirit-ranger", name: "Spirit Ranger" }],
-      pathfinder: [{ id: "forest-warden", name: "Forest Warden" }, { id: "storm-ranger", name: "Storm Ranger" }]
-    }
-  },
-  guardian: {
-    name: "Guardian", icon: "🛡️", description: "Kind, helpful, and protective.",
-    base: { strength: 6, wisdom: 5, agility: 3, kindness: 10, luck: 3, courage: 7 },
-    growth: { strength: 1, wisdom: 0, agility: 0, kindness: 2, luck: 0, courage: 1 },
-    abilities: [
-      { level: 1, name: "Helping Hand", text: "Celebrates teamwork and kindness." },
-      { level: 5, name: "Kindness Shield", text: "A protective helper badge." },
-      { level: 10, name: "Team Aura", text: "An advanced teamwork title." },
-      { level: 15, name: "Family Guardian", text: "The highest guardian honor." }
-    ],
-    branch1: [{ id: "protector", name: "Protector", icon: "🛡️" }, { id: "healer", name: "Healer", icon: "💚" }],
-    branch2: {
-      protector: [{ id: "sentinel", name: "Sentinel" }, { id: "royal-guard", name: "Royal Guard" }],
-      healer: [{ id: "light-keeper", name: "Light Keeper" }, { id: "heart-mender", name: "Heart Mender" }]
-    }
-  },
-  royal: {
-    name: "Royal Adventurer", icon: "👑", description: "Confident, imaginative, and born to lead.",
-    base: { strength: 4, wisdom: 5, agility: 4, kindness: 7, luck: 9, courage: 7 },
-    growth: { strength: 0, wisdom: 1, agility: 0, kindness: 1, luck: 2, courage: 1 },
-    abilities: [
-      { level: 1, name: "Royal Welcome", text: "A bright beginning for a royal adventurer." },
-      { level: 5, name: "Magical Heritage", text: "Choose a unicorn or dragon path." },
-      { level: 10, name: "Royal Aura", text: "An advanced royal effect and title." },
-      { level: 15, name: "Legendary Crown", text: "The final royal mastery reward." }
-    ],
-    branch1: [{ id: "unicorn-princess", name: "Unicorn Princess", icon: "🦄" }, { id: "dragon-prince", name: "Dragon Prince", icon: "🐉" }],
-    branch2: {
-      "unicorn-princess": [{ id: "rainbow-queen", name: "Rainbow Queen" }, { id: "starlight-guardian", name: "Starlight Guardian" }],
-      "dragon-prince": [{ id: "flame-king", name: "Flame King" }, { id: "dragon-rider", name: "Dragon Rider" }]
-    }
-  }
-};
 
 const STAT_KEYS = ["strength", "wisdom", "agility", "kindness", "luck", "courage"];
 
