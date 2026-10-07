@@ -1472,8 +1472,9 @@ function displayItemName(item) {
   if (!item) return "Nothing equipped";
   const definition = ITEM_TYPES[item.itemType];
   if (!definition) return item.name || "Unknown Item";
-  if (item.grade === "wood") return definition.name;
-  return item.name || `${ITEM_GRADES[item.grade]?.name || ""} ${definition.name}`.trim();
+  const rarity = normalizeRarity(item.rarity || item.grade);
+  if (item.name) return item.name;
+  return rarity === "common" ? definition.name : `${ITEM_GRADES[rarity].name} ${definition.name}`;
 }
 
 function statAbbreviation(key) {
@@ -1506,7 +1507,7 @@ function equipmentComparisonHtml(candidate, current) {
 function renderEquippedLoadout(equipment) {
   return Object.entries(EQUIPMENT_SLOTS).map(([slot, label]) => {
     const item = equipment?.[slot] || null;
-    const grade = item ? (ITEM_GRADES[item.grade] || ITEM_GRADES.wood) : null;
+    const grade = item ? ITEM_GRADES[normalizeRarity(item.rarity || item.grade)] : null;
     return `
       <button class="loadout-slot ${item ? "filled" : "empty"}" type="button" data-loadout-slot="${slot}" aria-label="${escapeAttribute(label)}">
         <span class="loadout-slot-label">${escapeHtml(label)}</span>
@@ -1571,7 +1572,7 @@ function renderClassScreen(kid) {
 
   const equipmentRows = Object.entries(EQUIPMENT_SLOTS).map(([slot, label]) => {
     const item = equipped[slot];
-    const grade = item ? (ITEM_GRADES[item.grade] || ITEM_GRADES.wood) : null;
+    const grade = item ? ITEM_GRADES[normalizeRarity(item.rarity || item.grade)] : null;
     return `
       <button class="equipment-slot-row" type="button" data-equipment-slot="${slot}">
         <span class="equipment-slot-icon" ${grade ? `style="border-color:${grade.color};box-shadow:0 0 14px ${grade.glow};"` : ""}>
@@ -1746,7 +1747,7 @@ function renderClassScreen(kid) {
 
         <div class="equipment-choice-list">
           ${matchingItems.length ? matchingItems.map(item => {
-            const grade = ITEM_GRADES[item.grade] || ITEM_GRADES.wood;
+            const grade = ITEM_GRADES[normalizeRarity(item.rarity || item.grade)];
             const isSelected = selectedItem?.instanceId === item.instanceId;
             return `
               <button class="equipment-choice-row ${isSelected ? "selected" : ""}" type="button" data-item-id="${escapeAttribute(item.instanceId)}">
