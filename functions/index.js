@@ -449,7 +449,7 @@ function publicBattleState(data, sessionId) {
   };
 }
 
-exports.startBattle = onCall({maxInstances: 3, invoker: "public"}, async (request) => {
+const startBattleHandler = async (request) => {
   try {
     const kidId = authorizedKidId(request);
     const adventureId = String(request.data?.adventureId || "");
@@ -538,7 +538,12 @@ exports.startBattle = onCall({maxInstances: 3, invoker: "public"}, async (reques
   }
 });
 
-exports.battleAction = onCall({maxInstances: 3, invoker: "public"}, async (request) => {
+};
+
+exports.startBattle = onCall({maxInstances: 3, invoker: "public"}, startBattleHandler);
+exports.startBattleV2 = onCall({maxInstances: 3, invoker: "public"}, startBattleHandler);
+
+const battleActionHandler = async (request) => {
   const kidId = authorizedKidId(request);
   const sessionId = String(request.data?.sessionId || "");
   const action = String(request.data?.action || "");
@@ -650,3 +655,7 @@ exports.battleAction = onCall({maxInstances: 3, invoker: "public"}, async (reque
 
   return result;
 });
+};
+
+exports.battleAction = onCall({maxInstances: 3, invoker: "public"}, battleActionHandler);
+exports.battleActionV2 = onCall({maxInstances: 3, invoker: "public"}, battleActionHandler);
