@@ -111,10 +111,18 @@ function ensureThemeControls() {
   applyThemePreference();
 }
 
+let themeControlObserver = null;
+
 function setAppTheme(mode = "default") {
   document.body.classList.add("kid-theme");
   document.body.classList.toggle("parent-theme", mode === "parent");
   applyThemePreference();
+  if (!themeControlObserver) {
+    themeControlObserver = new MutationObserver(() => {
+      if (!document.getElementById("themeModeControl")) ensureThemeControls();
+    });
+    themeControlObserver.observe(document.body, { childList: true });
+  }
   requestAnimationFrame(ensureThemeControls);
 }
 
