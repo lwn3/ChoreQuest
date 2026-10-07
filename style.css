@@ -1993,3 +1993,314 @@ button:disabled {
     font-size: 1.25rem;
   }
 }
+
+
+/* =========================================================
+   ADVENTURE, RARITY, AND MOD LAB
+========================================================= */
+
+.equipment-item-icon-fallback.rarity-poor,
+.equipment-item-icon-fallback.rarity-common,
+.equipment-item-icon-fallback.rarity-good {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.equipment-item-icon-fallback.rarity-poor {
+  opacity: .72;
+  filter: grayscale(.45) contrast(.9);
+}
+
+.equipment-item-icon-fallback.rarity-common {
+  opacity: .9;
+}
+
+.equipment-item-icon-fallback.rarity-good {
+  transform: scale(1.04);
+}
+
+.equipment-item-icon-image.rarity-rare {
+  filter: drop-shadow(0 3px 7px rgba(77, 163, 255, .35));
+}
+
+.equipment-item-icon-image.rarity-legendary {
+  filter: drop-shadow(0 4px 10px rgba(246, 201, 69, .48));
+}
+
+.equipment-item-icon-image.rarity-mythic {
+  filter: drop-shadow(0 4px 12px rgba(200, 121, 255, .6));
+}
+
+.adventure-resource-card {
+  padding: 16px;
+}
+
+.adventure-resource-head {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.adventure-resource-head > div {
+  padding: 12px;
+  background: rgba(4, 15, 40, .48);
+  border: 1px solid rgba(205, 226, 255, .14);
+  border-radius: 12px;
+}
+
+.adventure-resource-head span,
+.adventure-resource-head strong {
+  display: block;
+}
+
+.adventure-resource-head span {
+  margin-bottom: 4px;
+  color: #9db7dc;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.adventure-resource-head strong {
+  font-size: 1.1rem;
+}
+
+.food-inventory {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.food-use-btn {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-areas:
+    "icon name"
+    "icon detail";
+  gap: 2px 10px;
+  align-items: center;
+  min-height: 58px;
+  padding: 9px 11px;
+  text-align: left;
+  background: rgba(4, 15, 40, .42);
+  border: 1px solid rgba(205, 226, 255, .14);
+  box-shadow: none;
+}
+
+.food-use-btn > span {
+  grid-area: icon;
+  display: grid;
+  place-items: center;
+  font-size: 1.6rem;
+}
+
+.food-use-btn strong {
+  grid-area: name;
+}
+
+.food-use-btn small {
+  grid-area: detail;
+  color: #b8cbee;
+  font-size: .72rem;
+}
+
+.energy-empty {
+  margin: 10px 0 0;
+  color: var(--text-soft);
+  font-size: .82rem;
+  text-align: center;
+}
+
+.adventure-list {
+  display: grid;
+  gap: 10px;
+}
+
+.adventure-option {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  min-height: 92px;
+  padding: 12px;
+  text-align: left;
+  background: linear-gradient(145deg, rgba(31, 54, 91, .96), rgba(17, 32, 58, .96));
+  border: 1px solid rgba(205, 226, 255, .16);
+  box-shadow: var(--shadow-small);
+}
+
+.adventure-icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  font-size: 1.8rem;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(205, 226, 255, .14);
+  border-radius: 14px;
+}
+
+.adventure-copy strong,
+.adventure-copy small,
+.adventure-copy span {
+  display: block;
+}
+
+.adventure-copy strong {
+  margin-bottom: 3px;
+  font-size: 1rem;
+}
+
+.adventure-copy small {
+  margin-bottom: 7px;
+  color: #b8cbee;
+  font-size: .76rem;
+  line-height: 1.35;
+}
+
+.adventure-copy span {
+  color: #9fd8ff;
+  font-size: .7rem;
+  font-weight: 800;
+}
+
+.mod-adventurer-card {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 13px;
+  background:
+    linear-gradient(135deg, rgba(200, 121, 255, .14), rgba(84, 166, 255, .12));
+  border: 1px solid rgba(200, 121, 255, .35);
+  border-radius: 16px;
+  box-shadow: var(--shadow-small);
+}
+
+.mod-adventurer-card .avatar {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  font-size: 1.6rem;
+  background: rgba(255,255,255,.07);
+  border-radius: 14px;
+}
+
+.mod-adventurer-card strong,
+.mod-adventurer-card span {
+  display: block;
+}
+
+.mod-adventurer-card span {
+  margin-top: 3px;
+  color: #b8cbee;
+  font-size: .78rem;
+}
+
+.mod-warning {
+  border-color: rgba(200, 121, 255, .35);
+  background:
+    radial-gradient(circle at top right, rgba(200, 121, 255, .15), transparent 42%),
+    linear-gradient(145deg, rgba(35, 51, 84, .92), rgba(18, 29, 52, .92));
+}
+
+.mod-warning strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #ddb4ff;
+}
+
+.mod-warning p {
+  margin: 0;
+  color: #c7d5e9;
+  font-size: .82rem;
+}
+
+.mod-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mod-control-grid label {
+  display: grid;
+  gap: 6px;
+  color: #b8cbee;
+  font-size: .72rem;
+  font-weight: 800;
+}
+
+.mod-control-grid input,
+.mod-control-grid select,
+.mod-gear-row select {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 10px;
+  color: var(--text);
+  background: rgba(4, 15, 40, .65);
+  border: 1px solid rgba(205, 226, 255, .18);
+  border-radius: 10px;
+}
+
+.mod-gear-list {
+  display: grid;
+  gap: 8px;
+}
+
+.mod-gear-row {
+  display: grid;
+  grid-template-columns: minmax(110px, .8fr) minmax(140px, 1.2fr) minmax(100px, .8fr);
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  background: rgba(4, 15, 40, .4);
+  border: 1px solid rgba(205, 226, 255, .13);
+  border-radius: 11px;
+}
+
+.mod-gear-row small,
+.mod-gear-row strong {
+  display: block;
+}
+
+.mod-gear-row small {
+  margin-bottom: 3px;
+  color: #8fb8ef;
+  font-size: .64rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.mod-gear-row strong {
+  overflow: hidden;
+  font-size: .8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mod-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (max-width: 560px) {
+  .mod-control-grid,
+  .mod-shortcuts {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .mod-gear-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .mod-gear-row > div {
+    grid-column: 1 / -1;
+  }
+}
