@@ -1589,8 +1589,9 @@ function renderEquippedLoadout(equipment) {
 }
 
 function renderActiveCompanions(kid) {
-  const active = Array.isArray(kid?.activeCompanions) ? kid.activeCompanions.slice(0, 2) : [];
-  const slots = [0, 1].map(index => {
+  const companionCap = Math.min(3, 2 + Number(aggregatePassivePerks(kid).extraCompanion || 0));
+  const active = Array.isArray(kid?.activeCompanions) ? kid.activeCompanions.slice(0, companionCap) : [];
+  const slots = Array.from({length: companionCap}, (_, index) => {
     const companion = active[index];
     if (!companion) {
       return `
@@ -1599,7 +1600,7 @@ function renderActiveCompanions(kid) {
           <div>
             <small>Companion ${index + 1}</small>
             <strong>Empty</strong>
-            <span>Future tamed companions can be assigned here.</span>
+            <span>Tamed companions can be assigned here.</span>
           </div>
         </div>`;
     }
@@ -1620,7 +1621,7 @@ function renderActiveCompanions(kid) {
 
   return `
     <div class="companion-summary">
-      <p>Bring up to <strong>2</strong> companions. They support your class with special abilities rather than replacing your character in battle.</p>
+      <p>Bring up to <strong>${companionCap}</strong> companion${companionCap === 1 ? "" : "s"}. They support your class with special abilities rather than replacing your character in battle.</p>
       <div class="companion-slot-list">${slots}</div>
     </div>`;
 }
@@ -1773,7 +1774,7 @@ function renderClassScreen(kid) {
             ⚔️ Gear <span>${equippedGearCount}/${Object.keys(EQUIPMENT_SLOTS).length}</span>
           </button>
           <button class="quick-panel-btn" type="button" data-panel-target="companionQuickPanel">
-            🐾 Companions <span>${Math.min(2, Array.isArray(kid.activeCompanions) ? kid.activeCompanions.length : 0)}/2</span>
+            🐾 Companions <span>${Math.min(3, Array.isArray(kid.activeCompanions) ? kid.activeCompanions.length : 0)}/${Math.min(3, 2 + Number(aggregatePassivePerks(kid).extraCompanion || 0))}</span>
           </button>
         </div>
         <div id="gearQuickPanel" class="quick-panel-card" hidden>
