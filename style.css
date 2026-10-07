@@ -1498,3 +1498,224 @@ button:disabled {
     grid-row: 3;
   }
 }
+
+
+/* =========================================================
+   ATTRIBUTE RADAR + EQUIPMENT PREVIEW
+========================================================= */
+
+.attribute-overview,
+.equipment-preview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(170px, .85fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.stat-radar-wrap {
+  min-width: 0;
+}
+
+.stat-radar {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto;
+  color: var(--text);
+}
+
+.stat-radar-ring {
+  fill: none;
+  stroke: rgba(220, 235, 255, 0.16);
+  stroke-width: 1;
+}
+
+.stat-radar-ring.outer {
+  stroke: rgba(220, 235, 255, 0.3);
+}
+
+.stat-radar-axis {
+  stroke: rgba(220, 235, 255, 0.16);
+  stroke-width: 1;
+}
+
+.stat-radar-label {
+  fill: #d7e8ff;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .04em;
+}
+
+.stat-radar-shape {
+  vector-effect: non-scaling-stroke;
+  stroke-width: 2.5;
+}
+
+.stat-radar-shape.current {
+  fill: rgba(118, 103, 255, 0.28);
+  stroke: #9d91ff;
+}
+
+.stat-radar-shape.proposed {
+  fill: rgba(51, 211, 197, 0.22);
+  stroke: #33d3c5;
+}
+
+.stat-radar-legend {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-top: -6px;
+  color: #b8cbee;
+  font-size: .72rem;
+  font-weight: 800;
+}
+
+.stat-radar-legend span::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+
+.stat-radar-legend .current::before {
+  background: rgba(118, 103, 255, .5);
+  border: 1px solid #9d91ff;
+}
+
+.stat-radar-legend .proposed::before {
+  background: rgba(51, 211, 197, .42);
+  border: 1px solid #33d3c5;
+}
+
+.stat-number-list {
+  display: grid;
+  gap: 6px;
+}
+
+.stat-number-row {
+  display: grid;
+  grid-template-columns: minmax(54px, 1fr) auto auto auto auto;
+  gap: 7px;
+  align-items: center;
+  min-height: 36px;
+  padding: 7px 9px;
+  background: rgba(4, 15, 40, 0.48);
+  border: 1px solid rgba(205, 226, 255, 0.13);
+  border-radius: 9px;
+}
+
+.stat-number-name {
+  color: #b8d2f6;
+  font-size: .7rem;
+  font-weight: 900;
+  letter-spacing: .07em;
+}
+
+.stat-number-row strong {
+  font-size: .95rem;
+}
+
+.stat-number-arrow {
+  color: #7790b3;
+  font-size: .8rem;
+}
+
+.stat-number-row small {
+  min-width: 28px;
+  font-size: .68rem;
+  font-weight: 900;
+  text-align: right;
+}
+
+.stat-number-row .positive {
+  color: #86f4bd;
+}
+
+.stat-number-row .negative {
+  color: #ff9aaa;
+}
+
+.stat-number-row .neutral {
+  color: #c1d0e9;
+}
+
+.attribute-overview-card .jrpg-stat-grid {
+  margin-top: 14px;
+}
+
+.equipment-preview-card {
+  margin: 12px 0 14px;
+  padding: 12px;
+  background:
+    radial-gradient(circle at top right, rgba(118, 103, 255, .13), transparent 40%),
+    rgba(4, 15, 40, .42);
+  border: 1px solid rgba(205, 226, 255, .16);
+  border-radius: 12px;
+}
+
+.equipment-preview-card.active {
+  border-color: rgba(51, 211, 197, .38);
+}
+
+.equipment-preview-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.equipment-preview-heading small,
+.equipment-preview-heading strong {
+  display: block;
+}
+
+.equipment-preview-heading small {
+  margin-bottom: 3px;
+  color: #8fb8ef;
+  font-size: .66rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.equipment-preview-heading strong {
+  font-size: .96rem;
+}
+
+.equipment-preview-heading button {
+  min-height: 38px;
+  padding: 8px 12px;
+  white-space: nowrap;
+  background: linear-gradient(135deg, var(--secondary), #49a7ff);
+}
+
+.equipment-choice-row.selected {
+  background: rgba(51, 211, 197, .14);
+  border-color: rgba(51, 211, 197, .48);
+  box-shadow: inset 4px 0 0 var(--secondary);
+}
+
+@media (max-width: 560px) {
+  .attribute-overview,
+  .equipment-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-radar {
+    max-width: 310px;
+  }
+
+  .equipment-preview-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .equipment-preview-heading button {
+    width: 100%;
+  }
+}
