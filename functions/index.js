@@ -170,3 +170,208 @@ exports.setChildPin = onCall({maxInstances: 2}, async (request) => {
 
   return {success: true};
 });
+
+
+const MAX_ENERGY = 30;
+const MAX_SLEEPINESS = 8;
+
+const FOOD_ENERGY = {
+  gummy_bears: 3,
+  chocolate_bar: 6,
+  lollipop: 10,
+  streak_bubble_gum: 15,
+  apple_slices: 3,
+  rice_ball: 6,
+  dumplings: 10,
+  streak_ramen: 15,
+};
+
+const ADVENTURES = {
+  forest: {energy: 5, sleepiness: 1, enemyPower: 42, xp: 15, gold: 10},
+  ruins: {energy: 8, sleepiness: 2, enemyPower: 60, xp: 28, gold: 20},
+  vault: {energy: 12, sleepiness: 3, enemyPower: 82, xp: 45, gold: 35},
+};
+
+const CLASS_STATS = {
+  warrior: {
+    base: {strength: 8, wisdom: 3, agility: 5, kindness: 4, luck: 3, courage: 8},
+    growth: {strength: 2, wisdom: 0, agility: 1, kindness: 0, luck: 0, courage: 1},
+  },
+  rogue: {
+    base: {strength: 4, wisdom: 4, agility: 9, kindness: 3, luck: 7, courage: 5},
+    growth: {strength: 0, wisdom: 0, agility: 2, kindness: 0, luck: 1, courage: 1},
+  },
+  mage: {
+    base: {strength: 2, wisdom: 10, agility: 4, kindness: 5, luck: 6, courage: 4},
+    growth: {strength: 0, wisdom: 2, agility: 0, kindness: 0, luck: 1, courage: 1},
+  },
+  ranger: {
+    base: {strength: 5, wisdom: 5, agility: 8, kindness: 7, luck: 4, courage: 5},
+    growth: {strength: 0, wisdom: 1, agility: 2, kindness: 1, luck: 0, courage: 0},
+  },
+  guardian: {
+    base: {strength: 6, wisdom: 5, agility: 3, kindness: 10, luck: 3, courage: 7},
+    growth: {strength: 1, wisdom: 0, agility: 0, kindness: 2, luck: 0, courage: 1},
+  },
+  royal: {
+    base: {strength: 4, wisdom: 5, agility: 4, kindness: 7, luck: 9, courage: 7},
+    growth: {strength: 0, wisdom: 1, agility: 0, kindness: 1, luck: 2, courage: 1},
+  },
+};
+
+function chicagoDateKey() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function authorizedKidId(request) {
+  const requested = cleanKidId(request.data?.kidId);
+  const email = String(request.auth?.token?.email || "").toLowerCase();
+  if (request.auth && PARENT_EMAILS.has(email)) return requested;
+  if (
+    request.auth?.token?.role === "child" &&
+    String(request.auth?.token?.kidId || "") === requested
+  ) {
+    return requested;
+  }
+  throw new HttpsError("permission-denied", "Adventurer access required.");
+}
+
+function calculateCombatStats(kid) {
+  const def = CLASS_STATS[kid.classId] || CLASS_STATS.warrior;
+  const level = Math.max(1, Number(kid.level || 1));
+  const keys = ["strength", "wisdom", "agility", "kindness", "luck", "courage"];
+  const stats = {};
+
+  keys.forEach((key) => {
+    stats[key] =
+      Number(def.base[key] || 0) +
+      Math.max(0, level - 1) * Number(def.growth[key] || 0);
+  });
+
+  Object.values(kid.equipment || {}).forEach((item) => {
+    Object.entries(item?.bonuses || {}).forEach(([key, value]) => {
+      if (Object.prototype.hasOwnProperty.call(stats, key)) {
+        stats[key] += Number(value || 0);
+      }
+    });
+  });
+
+  return stats;
+}
+
+function combatPower(stats) {
+  return (
+    stats.strength * 1.25 +
+    stats.wisdom * 1.25 +
+    stats.agility +
+    stats.kindness * 0.4 +
+    stats.luck * 0.6 +
+    stats.courage * 1.1
+  );
+}
+
+exports.consumeFood = onCall({maxInstances: 3}, async (request) => {
+  const kidId = authorizedKidId(request);
+  const foodId = String(request.data?.foodId || "");
+  const energyValue = FOOD_ENERGY[foodId];
+
+  if (!energyValue) {
+    throw new HttpsError("invalid-argument", "Unknown food item.");
+  }
+
+  const kidRef = db.collection("kids").doc(kidId);
+
+  const result = await db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(kidRef);
+    if (!snap.exists) throw new HttpsError("not-found", "Adventurer not found.");
+
+    const kid = snap.data();
+    const inventory = {...(kid.foodInventory || {})};
+    const count = Number(inventory[foodId] || 0);
+    if (count <= 0) throw new HttpsError("failed-precondition", "You do not have that food.");
+
+    const currentEnergy = Math.min(MAX_ENERGY, Number(kid.energy ?? MAX_ENERGY));
+    if (currentEnergy >= MAX_ENERGY) {
+      throw new HttpsError("failed-precondition", "Energy is already full.");
+    }
+
+    inventory[foodId] = count - 1;
+    const energy = Math.min(MAX_ENERGY, currentEnergy + energyValue);
+    transaction.update(kidRef, {foodInventory: inventory, energy});
+    return {energy, foodInventory: inventory};
+  });
+
+  return result;
+});
+
+exports.runAdventure = onCall({maxInstances: 3}, async (request) => {
+  const kidId = authorizedKidId(request);
+  const adventureId = String(request.data?.adventureId || "");
+  const adventure = ADVENTURES[adventureId];
+  if (!adventure) throw new HttpsError("invalid-argument", "Unknown adventure.");
+
+  const kidRef = db.collection("kids").doc(kidId);
+  const today = chicagoDateKey();
+  const battleRoll = 0.85 + Math.random() * 0.3;
+  const rewardRoll = 0.9 + Math.random() * 0.2;
+
+  const result = await db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(kidRef);
+    if (!snap.exists) throw new HttpsError("not-found", "Adventurer not found.");
+
+    const kid = snap.data();
+    const energy = Math.min(MAX_ENERGY, Number(kid.energy ?? MAX_ENERGY));
+    const sleepiness = kid.sleepinessDate === today ? Number(kid.sleepiness || 0) : 0;
+
+    if (energy < adventure.energy) {
+      throw new HttpsError("failed-precondition", "Not enough energy. Eat some quest food first.");
+    }
+    if (sleepiness + adventure.sleepiness > MAX_SLEEPINESS) {
+      throw new HttpsError("failed-precondition", "Too sleepy to adventure again today.");
+    }
+
+    const stats = calculateCombatStats(kid);
+    const power = combatPower(stats) * battleRoll;
+    const won = power >= adventure.enemyPower;
+
+    const update = {
+      energy: energy - adventure.energy,
+      sleepiness: sleepiness + adventure.sleepiness,
+      sleepinessDate: today,
+      lastAdventureAt: FieldValue.serverTimestamp(),
+    };
+
+    let xp = 0;
+    let gold = 0;
+    let level = Math.max(1, Number(kid.level || 1));
+    if (won) {
+      xp = Math.max(1, Math.round(adventure.xp * rewardRoll));
+      gold = Math.max(1, Math.round(adventure.gold * rewardRoll));
+      const newXp = Number(kid.xp || 0) + xp;
+      level = Math.floor(newXp / 100) + 1;
+      update.xp = newXp;
+      update.gold = Number(kid.gold || 0) + gold;
+      update.level = level;
+    }
+
+    transaction.update(kidRef, update);
+
+    return {
+      won,
+      xp,
+      gold,
+      level,
+      energy: update.energy,
+      sleepiness: update.sleepiness,
+      playerPower: Math.round(power),
+      enemyPower: adventure.enemyPower,
+    };
+  });
+
+  return result;
+});
