@@ -44,6 +44,9 @@ jobs:
           service_account: github-actions-deploy@chorequest-3a721.iam.gserviceaccount.com
           create_credentials_file: true
 
+      - name: Reset players for Class Tree V2
+        run: node functions/scripts/reset-class-system-v2.js
+
       - name: Install Firebase CLI
         run: npm install --global firebase-tools@latest
 
