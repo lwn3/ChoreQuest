@@ -17,6 +17,7 @@ const PARENT_EMAILS = new Set([
   "anitanelson1987@gmail.com",
 ]);
 const MAX_ATTEMPTS = 5;
+const GAME_CALLABLE_DEPLOY_REV = "2026-10-07-2";
 const LOCK_MILLISECONDS = 15 * 60 * 1000;
 
 function sha256(value) {
@@ -491,6 +492,7 @@ exports.startBattle = onCall({maxInstances: 3, invoker: "public"}, async (reques
     const data = {
       kidId,
       adventureId,
+      deployRevision: GAME_CALLABLE_DEPLOY_REV,
       status: "active",
       turn: 1,
       playerName: kid.name || kidId,
