@@ -2127,8 +2127,8 @@ function unlockedCombatSkills(kid) {
   return learnedActiveSkills(kid, kid.classId);
 }
 
-function companionBattleEffects(kid) {
-  return (Array.isArray(kid.activeCompanions) ? kid.activeCompanions : []).slice(0, 2).map(companion => {
+function companionBattleEffects(kid, maxCompanions = 2) {
+  return (Array.isArray(kid.activeCompanions) ? kid.activeCompanions : []).slice(0, maxCompanions).map(companion => {
     const raw = String(companion.effectId || companion.abilityId || companion.abilityName || companion.ability || "").toLowerCase();
     let effect = raw;
     if (raw.includes("double")) effect = "double_cast";
