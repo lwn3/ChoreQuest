@@ -861,10 +861,10 @@ async function loadKidEntry(kidId) {
         <section class="card form-card">
           ${kid.pinConfigured ? `
             <div class="form-field"><label for="kidPin">PIN</label><input id="kidPin" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off"></div>
-            <button id="unlockKidBtn" type="button">Enter the Realm</button>
+            <button id="unlockKidBtn" type="button">Continue</button>
             <p id="pinMessage" aria-live="polite"></p>`
           : '<p>This profile does not have a PIN yet. Ask a parent to set one in Family Accounts.</p>'}
-          <button id="backHomeBtn" type="button">← Choose Another Profile</button>
+          <button id="backHomeBtn" type="button">← Choose another profile</button>
         </section>
       </main>`;
 
@@ -1717,7 +1717,7 @@ function renderClassScreen(kid) {
       ${canChooseBranch1 ? `<section class="card"><h2>Choose Your Level 5 Path</h2>${def.branch1.map(b => `<button class="choose-branch1-btn" data-branch-id="${b.id}" type="button" style="width:100%;margin-bottom:10px;">${b.icon} ${escapeHtml(b.name)}</button>`).join("")}</section>` : ""}
       ${canChooseBranch2 ? `<section class="card"><h2>Choose Your Level 10 Path</h2>${(def.branch2[kid.classBranch1] || []).map(b => `<button class="choose-branch2-btn" data-branch-id="${b.id}" type="button" style="width:100%;margin-bottom:10px;">🌟 ${escapeHtml(b.name)}</button>`).join("")}</section>` : ""}
 
-      <button id="classScreenBackBtn" type="button" style="width:100%;">← Back to Quests</button>
+      <button id="classScreenBackBtn" type="button" style="width:100%;">← Back</button>
     </main>`;
 
   document.querySelectorAll(".choose-branch1-btn").forEach(button => button.addEventListener("click", async () => {
