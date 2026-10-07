@@ -2140,7 +2140,8 @@ async function loadAdventureScreen(kidId) {
           const result = await startBattleCall({ kidId, adventureId: button.dataset.adventureId });
           await renderBattleScreen(kidId, result?.data || {});
         } catch (err) {
-          alert(err?.message || "Adventure could not start.");
+          const detail = err?.message || err?.details || err?.code || "Adventure could not start.";
+          alert(detail);
           button.disabled = false;
         }
       });
