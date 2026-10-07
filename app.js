@@ -1061,7 +1061,7 @@ function attachScheduleFormBehavior() {
     const value = scheduleSelect.value;
     if (weekdayBox) weekdayBox.hidden = value !== "weekdays";
     if (intervalBox) intervalBox.hidden = value !== "interval";
-    if (dueDateLabel) dueDateLabel.textContent = value === "one-time" ? "Due date" : "Start / due date";
+    if (dueDateLabel) dueDateLabel.textContent = value === "one-time" ? "Due date" : "Start date";
   };
 
   scheduleSelect.addEventListener("change", sync);
@@ -2900,17 +2900,17 @@ function renderQuestScheduleEditor(quest = {}, quests = [], editingQuestId = "")
     .join("");
 
   return `
-    ${formField("Parent task", `
+    ${formField("Subtask of (optional)", `
       <select id="questParent">
-        <option value="">None — top-level task</option>
+        <option value="">No parent — top-level task</option>
         ${parentOptions}
       </select>
     `)}
 
     ${formField("Repeat", `
       <select id="questScheduleType">
-        <option value="interval" ${scheduleType === "interval" ? "selected" : ""}>Every N days</option>
-        <option value="weekdays" ${scheduleType === "weekdays" ? "selected" : ""}>Specific weekdays</option>
+        <option value="interval" ${scheduleType === "interval" ? "selected" : ""}>Every X days</option>
+        <option value="weekdays" ${scheduleType === "weekdays" ? "selected" : ""}>On selected weekdays</option>
         <option value="one-time" ${scheduleType === "one-time" ? "selected" : ""}>Does not repeat</option>
       </select>
     `)}
@@ -2928,7 +2928,7 @@ function renderQuestScheduleEditor(quest = {}, quests = [], editingQuestId = "")
       ${weekdayCheckboxes(quest.weekdays || [])}
     </div>
 
-    ${formField(`<span id="questDueDateLabel">${scheduleType === "one-time" ? "Due date" : "Start / due date"}</span>`,
+    ${formField(`<span id="questDueDateLabel">${scheduleType === "one-time" ? "Due date" : "Start date"}</span>`,
       `<input id="questDueDate" type="date" value="${escapeAttribute(quest.dueDate || quest.startDate || getTodayKey())}">`,
       true
     )}
@@ -2970,6 +2970,7 @@ function renderQuestManagerRow(quest, allQuests, kidNames) {
         </div>
       </div>
       <div class="task-manager-actions">
+        <button class="add-subtask-btn" type="button" data-parent-quest-id="${escapeAttribute(quest.questId)}" ${quest.archived === true ? "disabled" : ""} title="Add subtask">＋</button>
         <button class="edit-quest-btn" type="button" data-quest-id="${escapeAttribute(quest.questId)}" ${quest.archived === true ? "disabled" : ""} title="Edit">✏️</button>
         <button class="archive-quest-btn" type="button" data-quest-id="${escapeAttribute(quest.questId)}" data-archived="${quest.archived === true ? "true" : "false"}" title="${quest.archived === true ? "Restore" : "Archive"}">${quest.archived === true ? "♻️" : "📦"}</button>
         <button class="delete-quest-btn" type="button" data-quest-id="${escapeAttribute(quest.questId)}" data-quest-name="${escapeAttribute(quest.name || "Unnamed quest")}" title="Delete">🗑️</button>
@@ -3058,6 +3059,12 @@ async function loadQuestManager(user) {
 
     attachSignOutEvent();
 
+    document.querySelectorAll(".add-subtask-btn").forEach(button => {
+      button.addEventListener("click", () => {
+        loadNewQuestForm(button.dataset.parentQuestId);
+      });
+    });
+
     document.querySelectorAll(".edit-quest-btn").forEach(button => {
       button.addEventListener("click", () => {
         loadEditQuestForm(button.dataset.questId);
@@ -3080,7 +3087,7 @@ async function loadQuestManager(user) {
     document
       .getElementById("newQuestBtn")
       .addEventListener("click", () => {
-        loadNewQuestForm();
+        loadNewQuestForm("");
       });
 
     document
@@ -3265,7 +3272,7 @@ async function loadEditQuestForm(questId) {
   }
 }
 
-async function loadNewQuestForm() {
+async function loadNewQuestForm(parentQuestId = "") {
   setAppTheme("parent");
   try {
     const [kidsSnap, allQuestSnap] = await Promise.all([
@@ -3298,7 +3305,7 @@ async function loadNewQuestForm() {
             </select>
           `)}
 
-          ${renderQuestScheduleEditor({ scheduleType: "interval", intervalDays: 1, startDate: today, dueDate: today }, allQuests)}
+          ${renderQuestScheduleEditor({ scheduleType: "interval", intervalDays: 1, startDate: today, dueDate: today, parentQuestId }, allQuests)}
 
           ${formField("Adventure food reward", `
             <select id="questFoodTier">
