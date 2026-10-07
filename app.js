@@ -1964,11 +1964,11 @@ async function approveSubmissionCore(submissionId) {
   try {
     const subRef = doc(db, "questSubmissions", submissionId);
     const subSnap = await getDoc(subRef);
-    if (!subSnap.exists()) { alert("Submission not found."); return; }
+    if (!subSnap.exists()) return false;
     const submission = { submissionId, ...subSnap.data() };
-    if (submission.status !== "Pending") { alert("This submission was already reviewed."); return; }
+    if (submission.status !== "Pending") return false;
     const questSnap = await getDoc(doc(db, "quests", submission.questId));
-    if (!questSnap.exists()) { alert("Quest not found."); return; }
+    if (!questSnap.exists()) throw new Error("Quest not found for " + (submission.questName || submissionId));
     const quest = questSnap.data();
     const participants = Array.from(new Set(submission.participantIds || [submission.submittedBy]));
     const isFullReward = quest.kidId !== ANYONE_ID && participants.includes(quest.kidId) && submission.submittedBy === quest.kidId;
