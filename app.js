@@ -173,13 +173,27 @@ const STAT_KEYS = ["strength", "wisdom", "agility", "kindness", "luck", "courage
 
 
 const ITEM_GRADES = {
-  wood: { name: "Wood", tradeValue: 1, multiplier: 1, color: "#a8753f", glow: "rgba(168,117,63,.35)" },
-  copper: { name: "Copper", tradeValue: 2, multiplier: 2, color: "#b87333", glow: "rgba(184,115,51,.35)" },
-  iron: { name: "Iron", tradeValue: 2, multiplier: 2, color: "#8b949e", glow: "rgba(139,148,158,.35)" },
-  silver: { name: "Silver", tradeValue: 4, multiplier: 3, color: "#d7e1ea", glow: "rgba(215,225,234,.4)" },
-  gold: { name: "Gold", tradeValue: 8, multiplier: 5, color: "#f6c945", glow: "rgba(246,201,69,.45)" },
-  mythril: { name: "Mythril", tradeValue: 16, multiplier: 7, color: "#72e7ff", glow: "rgba(114,231,255,.5)" }
+  poor: { name: "Poor", tradeValue: 1, multiplier: 0.75, color: "#7f8795", glow: "rgba(127,135,149,.2)" },
+  common: { name: "Common", tradeValue: 2, multiplier: 1, color: "#c5d0df", glow: "rgba(197,208,223,.22)" },
+  good: { name: "Good", tradeValue: 4, multiplier: 1.5, color: "#52d273", glow: "rgba(82,210,115,.28)" },
+  rare: { name: "Rare", tradeValue: 8, multiplier: 2.25, color: "#4da3ff", glow: "rgba(77,163,255,.35)" },
+  legendary: { name: "Legendary", tradeValue: 18, multiplier: 3.5, color: "#f6c945", glow: "rgba(246,201,69,.48)" },
+  mythic: { name: "Mythic", tradeValue: 32, multiplier: 5, color: "#c879ff", glow: "rgba(200,121,255,.55)" }
 };
+
+const LEGACY_GRADE_TO_RARITY = {
+  wood: "common",
+  copper: "good",
+  iron: "good",
+  silver: "rare",
+  gold: "legendary",
+  mythril: "mythic"
+};
+
+function normalizeRarity(value) {
+  const raw = String(value || "common").toLowerCase();
+  return ITEM_GRADES[raw] ? raw : (LEGACY_GRADE_TO_RARITY[raw] || "common");
+}
 
 const ITEM_TYPES = {
   // --- WOOD TIER: MAIN HAND ---
@@ -226,8 +240,8 @@ const ITEM_TYPES = {
   willow_ring: { name: "Willow Ring", slot: "accessory", icon: "💍", iconFile: "wooden_pendant.webp", bonuses: { kindness: 2 } }
 };
 
-const INVENTORY_VERSION = 2;
-const STARTER_WOOD_ITEM_TYPES = [
+const INVENTORY_VERSION = 3;
+const STARTER_ITEM_TYPES = [
   "wooden_sword",
   "stick",
   "branch",
@@ -250,7 +264,7 @@ const STARTER_WOOD_ITEM_TYPES = [
   "moss_cloak",
   "wooden_pendant",
   "acorn_charm",
-  "pinecone_amulet",
+  "pinecone_amulet"
 ];
 
 const STARTER_EQUIPMENT_TYPES = {
@@ -273,42 +287,53 @@ const EQUIPMENT_SLOTS = {
   companion: "Companion"
 };
 
-function createItem(itemType, grade = "wood") {
+function createItem(itemType, rarity = "common") {
   const def = ITEM_TYPES[itemType];
   if (!def) throw new Error(`Unknown item type: ${itemType}`);
-  const gradeDef = ITEM_GRADES[grade] || ITEM_GRADES.wood;
+  const normalizedRarity = normalizeRarity(rarity);
+  const rarityDef = ITEM_GRADES[normalizedRarity];
+  const scaledBonuses = Object.fromEntries(Object.entries(def.bonuses).map(([key, value]) => [
+    key,
+    Math.max(1, Math.round(Number(value || 0) * rarityDef.multiplier))
+  ]));
   return {
     instanceId: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     itemType,
-    name: grade === "wood" ? def.name : `${gradeDef.name} ${def.name}`,
+    name: normalizedRarity === "common" ? def.name : `${rarityDef.name} ${def.name}`,
     slot: def.slot,
-    grade,
-    tradeValue: gradeDef.tradeValue,
-    bonuses: Object.fromEntries(Object.entries(def.bonuses).map(([key, value]) => [key, value * gradeDef.multiplier])),
+    grade: normalizedRarity,
+    rarity: normalizedRarity,
+    tradeValue: rarityDef.tradeValue,
+    bonuses: scaledBonuses,
     equipped: false,
     tradeable: true
   };
 }
 
 function starterInventory() {
-  return STARTER_WOOD_ITEM_TYPES.map(itemType => createItem(itemType, "wood"));
+  return STARTER_ITEM_TYPES.map(itemType => createItem(itemType, "common"));
 }
 
 function normalizeStoredItem(item) {
   if (!item || typeof item !== "object") return item;
   const def = ITEM_TYPES[item.itemType];
   if (!def) return item;
-  const grade = item.grade || "wood";
-  const gradeDef = ITEM_GRADES[grade] || ITEM_GRADES.wood;
+  const rarity = normalizeRarity(item.rarity || item.grade);
+  const rarityDef = ITEM_GRADES[rarity];
+  const bonuses = item.bonuses && typeof item.bonuses === "object"
+    ? item.bonuses
+    : Object.fromEntries(Object.entries(def.bonuses).map(([key, value]) => [
+      key,
+      Math.max(1, Math.round(Number(value || 0) * rarityDef.multiplier))
+    ]));
   return {
     ...item,
-    name: grade === "wood" ? def.name : `${gradeDef.name} ${def.name}`,
+    name: rarity === "common" ? def.name : `${rarityDef.name} ${def.name}`,
     slot: def.slot,
-    grade,
-    tradeValue: Number(item.tradeValue || gradeDef.tradeValue),
-    bonuses: item.bonuses && typeof item.bonuses === "object"
-      ? item.bonuses
-      : Object.fromEntries(Object.entries(def.bonuses).map(([key, value]) => [key, value * gradeDef.multiplier]))
+    grade: rarity,
+    rarity,
+    tradeValue: Number(item.tradeValue || rarityDef.tradeValue),
+    bonuses
   };
 }
 
@@ -323,18 +348,18 @@ async function ensureInventoryInitialized(kid) {
       .filter(([, item]) => Boolean(item))
   );
 
-  const ownedWoodTypes = new Set([
-    ...inventory.filter(item => (item.grade || "wood") === "wood").map(item => item.itemType),
-    ...Object.values(equipment).filter(item => (item?.grade || "wood") === "wood").map(item => item.itemType)
+  const ownedCommonTypes = new Set([
+    ...inventory.filter(item => normalizeRarity(item.rarity || item.grade) === "common").map(item => item.itemType),
+    ...Object.values(equipment).filter(item => normalizeRarity(item?.rarity || item?.grade) === "common").map(item => item.itemType)
   ]);
 
-  STARTER_WOOD_ITEM_TYPES.forEach(itemType => {
-    if (!ownedWoodTypes.has(itemType)) inventory.push(createItem(itemType, "wood"));
+  STARTER_ITEM_TYPES.forEach(itemType => {
+    if (!ownedCommonTypes.has(itemType)) inventory.push(createItem(itemType, "common"));
   });
 
   Object.entries(STARTER_EQUIPMENT_TYPES).forEach(([slot, itemType]) => {
     if (equipment[slot]) return;
-    const inventoryIndex = inventory.findIndex(item => item.itemType === itemType && (item.grade || "wood") === "wood");
+    const inventoryIndex = inventory.findIndex(item => item.itemType === itemType && normalizeRarity(item.rarity || item.grade) === "common");
     if (inventoryIndex < 0) return;
     const [item] = inventory.splice(inventoryIndex, 1);
     equipment[slot] = { ...item, equipped: true };
@@ -352,12 +377,15 @@ async function ensureInventoryInitialized(kid) {
 function itemIcon(item) {
   const def = ITEM_TYPES[item?.itemType];
   const fallback = escapeHtml(def?.icon || "🎁");
-  if (!def?.iconFile) return `<span class="equipment-item-icon-fallback">${fallback}</span>`;
-  const grade = String(item?.grade || "wood");
-  const src = `assets/equipment-icons/${grade}/${def.iconFile}?v=3`;
+  const rarity = normalizeRarity(item?.rarity || item?.grade);
+  if (!def?.iconFile || ["poor", "common", "good"].includes(rarity)) {
+    return `<span class="equipment-item-icon-fallback rarity-${rarity}">${fallback}</span>`;
+  }
+
+  const src = `assets/equipment-icons/wood/${def.iconFile}?v=3`;
   return `
-    <img class="equipment-item-icon-image" src="${escapeAttribute(src)}" alt="" onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
-    <span class="equipment-item-icon-fallback" hidden>${fallback}</span>`;
+    <img class="equipment-item-icon-image rarity-${rarity}" src="${escapeAttribute(src)}" alt="" onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+    <span class="equipment-item-icon-fallback rarity-${rarity}" hidden>${fallback}</span>`;
 }
 
 function equipmentBonuses(equipment) {
