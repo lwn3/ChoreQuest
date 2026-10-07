@@ -285,8 +285,7 @@ const EQUIPMENT_SLOTS = {
   accessory: "Accessory",
   cape: "Cape",
   main_hand: "Main Hand",
-  off_hand: "Off Hand",
-  companion: "Companion"
+  off_hand: "Off Hand"
 };
 
 function createItem(itemType, rarity = "common") {
@@ -1565,6 +1564,7 @@ function renderClassScreen(kid) {
   const unlocked = def.abilities.filter(a => level >= a.level);
   const locked = def.abilities.filter(a => level < a.level);
   const equipped = kid.equipment && typeof kid.equipment === "object" ? kid.equipment : {};
+  const equippedGearCount = Object.keys(EQUIPMENT_SLOTS).filter(slot => equipped[slot]).length;
   const inventory = Array.isArray(kid.inventory) ? kid.inventory : [];
   const gearBonuses = equipmentBonuses(equipped);
   const canChooseBranch1 = level >= 5 && !kid.classBranch1;
@@ -1618,7 +1618,7 @@ function renderClassScreen(kid) {
       <section class="character-quick-panels">
         <div class="character-quick-tabs">
           <button class="quick-panel-btn" type="button" data-panel-target="gearQuickPanel">
-            ⚔️ Gear <span>${Object.keys(equipped).length}/${Object.keys(EQUIPMENT_SLOTS).length}</span>
+            ⚔️ Gear <span>${equippedGearCount}/${Object.keys(EQUIPMENT_SLOTS).length}</span>
           </button>
           <button class="quick-panel-btn" type="button" data-panel-target="companionQuickPanel">
             🐾 Companions <span>${Math.min(2, Array.isArray(kid.activeCompanions) ? kid.activeCompanions.length : 0)}/2</span>
@@ -1662,7 +1662,7 @@ function renderClassScreen(kid) {
             <h2>Equipment</h2>
             <p>Choose a slot, then select a compatible item.</p>
           </div>
-          <span>${Object.keys(equipped).length}/${Object.keys(EQUIPMENT_SLOTS).length}</span>
+          <span>${equippedGearCount}/${Object.keys(EQUIPMENT_SLOTS).length}</span>
         </div>
         <div class="equipment-slot-list">${equipmentRows}</div>
       </section>
