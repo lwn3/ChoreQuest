@@ -955,25 +955,52 @@ function getWeekKey(date = new Date()) {
 }
 
 function getQuestScheduleType(quest) {
-  const value = quest.scheduleType || quest.type || "daily";
-  if (["daily", "weekdays", "weekly", "one-time"].includes(value)) return value;
-  return "one-time";
+  const value = String(quest.scheduleType || quest.type || "interval");
+  if (value === "daily") return "interval";
+  if (value === "weekly") return "interval";
+  if (["interval", "weekdays", "one-time"].includes(value)) return value;
+  return "interval";
+}
+
+function getQuestIntervalDays(quest) {
+  if (String(quest.scheduleType || quest.type) === "weekly") return 7;
+  if (String(quest.scheduleType || quest.type) === "daily") return 1;
+  return Math.max(1, Number(quest.intervalDays || 1));
+}
+
+function questStartDateKey(quest) {
+  return quest.startDate || quest.dueDate || String(quest.createdAt || "").slice(0, 10) || getTodayKey();
+}
+
+function daysBetweenDateKeys(fromKey, toKey) {
+  const from = dateFromKey(fromKey);
+  const to = dateFromKey(toKey);
+  return Math.round((to - from) / 86400000);
 }
 
 function getQuestPeriodKey(quest, date = new Date()) {
   const scheduleType = getQuestScheduleType(quest);
-  if (scheduleType === "weekly") return getWeekKey(date);
-  if (scheduleType === "one-time") return "one-time";
+  if (scheduleType === "one-time") return `one-time:${quest.dueDate || questStartDateKey(quest)}`;
   return getLocalDateKey(date);
 }
 
 function isQuestScheduledToday(quest, date = new Date()) {
   const scheduleType = getQuestScheduleType(quest);
+  const todayKey = getLocalDateKey(date);
+
+  if (scheduleType === "one-time") {
+    return !quest.dueDate || quest.dueDate === todayKey;
+  }
+
   if (scheduleType === "weekdays") {
     const weekdays = Array.isArray(quest.weekdays) ? quest.weekdays.map(Number) : [];
     return weekdays.includes(date.getDay());
   }
-  return true;
+
+  const intervalDays = getQuestIntervalDays(quest);
+  const startKey = questStartDateKey(quest);
+  const diff = daysBetweenDateKeys(startKey, todayKey);
+  return diff >= 0 && diff % intervalDays === 0;
 }
 
 function isQuestCompletedForCurrentPeriod(quest, history, date = new Date()) {
@@ -981,11 +1008,8 @@ function isQuestCompletedForCurrentPeriod(quest, history, date = new Date()) {
   return history.some(item => {
     if (item.questId !== quest.choreId) return false;
     if (item.periodKey) return item.periodKey === periodKey;
-    if (getQuestScheduleType(quest) === "weekly") {
-      return getWeekKey(new Date(`${item.questDate || getTodayKey()}T12:00:00`)) === periodKey;
-    }
     if (getQuestScheduleType(quest) === "one-time") return true;
-    return item.questDate === getTodayKey();
+    return item.questDate === getLocalDateKey(date);
   });
 }
 
@@ -993,7 +1017,7 @@ function isSubmissionForCurrentPeriod(quest, submission, date = new Date()) {
   if (submission.questId !== quest.choreId || submission.status !== "Pending") return false;
   const periodKey = getQuestPeriodKey(quest, date);
   if (submission.periodKey) return submission.periodKey === periodKey;
-  return submission.questDate === getTodayKey();
+  return submission.questDate === getLocalDateKey(date);
 }
 
 function scheduleLabel(quest) {
@@ -1001,38 +1025,81 @@ function scheduleLabel(quest) {
   if (scheduleType === "weekdays") {
     const selected = Array.isArray(quest.weekdays) ? quest.weekdays.map(Number) : [];
     const names = WEEKDAY_OPTIONS.filter(day => selected.includes(day.value)).map(day => day.short);
-    return names.length ? names.join(", ") : "Selected weekdays";
+    return names.length ? `Every ${names.join(", ")}` : "Selected weekdays";
   }
-  if (scheduleType === "weekly") return "Weekly";
-  if (scheduleType === "one-time") return "One-Time";
-  return "Daily";
+  if (scheduleType === "one-time") return quest.dueDate ? `Once on ${quest.dueDate}` : "One time";
+  const interval = getQuestIntervalDays(quest);
+  return interval === 1 ? "Every day" : `Every ${interval} days`;
 }
 
 function dueLabel(quest) {
-  if (quest.dueTime) return `Due ${quest.dueTime}`;
+  const datePart = quest.dueDate ? `Due ${quest.dueDate}` : "";
+  const timePart = quest.dueTime ? `${datePart ? " at " : "Due "}${quest.dueTime}` : "";
+  if (datePart || timePart) return `${datePart}${timePart}`;
   return quest.time || "Anytime";
 }
 
 function weekdayCheckboxes(selectedDays = []) {
   const selected = selectedDays.map(Number);
   return WEEKDAY_OPTIONS.map(day => `
-    <label style="display:flex;align-items:center;gap:7px;margin-right:10px;">
+    <label class="weekday-chip">
       <input class="quest-weekday" type="checkbox" value="${day.value}" ${selected.includes(day.value) ? "checked" : ""}>
-      ${day.short}
+      <span>${day.short}</span>
     </label>`).join("");
 }
 
 function attachScheduleFormBehavior() {
   const scheduleSelect = document.getElementById("questScheduleType");
   const weekdayBox = document.getElementById("weekdayOptions");
-  if (!scheduleSelect || !weekdayBox) return;
-  const sync = () => { weekdayBox.style.display = scheduleSelect.value === "weekdays" ? "flex" : "none"; };
+  const intervalBox = document.getElementById("intervalOptions");
+  const dueDateLabel = document.getElementById("questDueDateLabel");
+  if (!scheduleSelect) return;
+
+  const sync = () => {
+    const value = scheduleSelect.value;
+    if (weekdayBox) weekdayBox.hidden = value !== "weekdays";
+    if (intervalBox) intervalBox.hidden = value !== "interval";
+    if (dueDateLabel) dueDateLabel.textContent = value === "one-time" ? "Due date" : "Start / due date";
+  };
+
   scheduleSelect.addEventListener("change", sync);
   sync();
 }
 
 function getSelectedWeekdays() {
   return Array.from(document.querySelectorAll(".quest-weekday:checked")).map(input => Number(input.value));
+}
+
+function questHierarchyDepth(quest, byId) {
+  let depth = 0;
+  let parentId = quest.parentQuestId;
+  const seen = new Set();
+  while (parentId && byId[parentId] && depth < 4 && !seen.has(parentId)) {
+    seen.add(parentId);
+    depth += 1;
+    parentId = byId[parentId].parentQuestId;
+  }
+  return depth;
+}
+
+function sortQuestsForManager(quests) {
+  const byId = Object.fromEntries(quests.map(q => [q.questId, q]));
+  const children = new Map();
+  quests.forEach(q => {
+    const parent = q.parentQuestId && byId[q.parentQuestId] ? q.parentQuestId : "__root__";
+    if (!children.has(parent)) children.set(parent, []);
+    children.get(parent).push(q);
+  });
+  children.forEach(list => list.sort((a,b) => String(a.name || "").localeCompare(String(b.name || ""))));
+  const result = [];
+  const walk = parentId => {
+    (children.get(parentId) || []).forEach(q => {
+      result.push(q);
+      walk(q.questId);
+    });
+  };
+  walk("__root__");
+  return result;
 }
 
 /* -------------------------------------------------
@@ -1060,7 +1127,7 @@ function streakEligibleMainQuests(quests, kidId, date) {
     if (quest.archived === true || quest.active === false) return false;
     if (quest.kidId !== kidId) return false;
     const scheduleType = getQuestScheduleType(quest);
-    if (!['daily', 'weekdays'].includes(scheduleType)) return false;
+    if (!["interval", "weekdays"].includes(scheduleType)) return false;
     return isQuestScheduledToday(quest, date);
   });
 }
