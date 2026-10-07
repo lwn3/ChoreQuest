@@ -2215,29 +2215,146 @@ async function resetDailyQuestsIfNeeded() {
    ADVENTURES AND GUILDMASTER TEST LAB
 ------------------------------------------------- */
 
-const LOCAL_BATTLE_ADVENTURES = {
-  forest: {energy: 5, sleep: 1, xp: 15, gold: 10, enemies: [
-    {name: "Moss Slime", icon: "🟢", hp: 24, attack: 5, defense: 1},
-    {name: "Trail Goblin", icon: "👺", hp: 30, attack: 6, defense: 2}
-  ]},
-  ruins: {energy: 8, sleep: 2, xp: 28, gold: 20, enemies: [
-    {name: "Ruins Skeleton", icon: "💀", hp: 40, attack: 8, defense: 3},
-    {name: "Stone Beetle", icon: "🪲", hp: 48, attack: 7, defense: 5}
-  ]},
-  vault: {energy: 12, sleep: 3, xp: 45, gold: 35, enemies: [
-    {name: "Arcane Wisp", icon: "🔵", hp: 58, attack: 10, defense: 5},
-    {name: "Vault Sentinel", icon: "🗿", hp: 72, attack: 11, defense: 7}
-  ]}
+const CLASS_COMBAT_PROGRESSION = {
+  warrior: {
+    passive: {level: 1, name: "Battle Hardened", text: "+10% maximum HP.", maxHpMultiplier: 1.10},
+    skills: [
+      {level: 1, id: "power_strike", name: "Power Strike", icon: "💥", cost: 3, kind: "physical", multiplier: 1.8, text: "A heavy physical strike."},
+      {level: 5, id: "armor_break", name: "Armor Break", icon: "🔨", cost: 4, kind: "physical", multiplier: 1.55, armorPierce: 0.55, text: "Ignores much of the enemy's defense."},
+      {level: 10, id: "second_wind", name: "Second Wind", icon: "❤️", cost: 5, healPct: 0.32, text: "Recover 32% of maximum HP."},
+      {level: 15, id: "heroic_strike", name: "Heroic Strike", icon: "⚔️", cost: 7, kind: "physical", multiplier: 2.7, text: "A powerful finishing attack."}
+    ]
+  },
+  rogue: {
+    passive: {level: 1, name: "Opportunist", text: "+7% critical-hit chance.", critBonus: 0.07},
+    skills: [
+      {level: 1, id: "flurry", name: "Flurry", icon: "🗡️", cost: 3, kind: "physical", multiplier: 1.65, critBonus: 0.08, text: "Fast attack with extra critical chance."},
+      {level: 5, id: "shadowstep", name: "Shadowstep", icon: "🌑", cost: 4, kind: "physical", multiplier: 1.35, evasionTurns: 2, text: "Attack and greatly improve dodge for 2 turns."},
+      {level: 10, id: "lucky_stab", name: "Lucky Stab", icon: "🍀", cost: 5, kind: "physical", multiplier: 2.0, critBonus: 0.25, text: "A risky strike with very high critical chance."},
+      {level: 15, id: "phantom_flurry", name: "Phantom Flurry", icon: "👤", cost: 7, kind: "physical", multiplier: 2.55, critBonus: 0.12, text: "A rapid master-level attack."}
+    ]
+  },
+  mage: {
+    passive: {level: 1, name: "Mana Well", text: "+2 maximum SP.", maxSpBonus: 2},
+    skills: [
+      {level: 1, id: "arc_bolt", name: "Arc Bolt", icon: "✨", cost: 3, kind: "magic", multiplier: 1.85, text: "A focused magical blast."},
+      {level: 5, id: "mana_surge", name: "Mana Surge", icon: "💠", cost: 0, spRestore: 4, text: "Restore 4 SP. Does not deal damage."},
+      {level: 10, id: "fireball", name: "Fireball", icon: "🔥", cost: 5, kind: "magic", multiplier: 2.35, text: "Heavy magical damage."},
+      {level: 15, id: "starfall", name: "Starfall", icon: "🌠", cost: 8, kind: "magic", multiplier: 3.0, text: "A master spell with massive damage."}
+    ]
+  },
+  ranger: {
+    passive: {level: 1, name: "Trail Instinct", text: "+5% dodge chance.", dodgeBonus: 0.05},
+    skills: [
+      {level: 1, id: "piercing_shot", name: "Piercing Shot", icon: "🏹", cost: 3, kind: "physical", multiplier: 1.75, armorPierce: 0.45, text: "A shot that cuts through defense."},
+      {level: 5, id: "quick_volley", name: "Quick Volley", icon: "🎯", cost: 4, kind: "physical", multiplier: 1.95, critBonus: 0.08, text: "A fast, accurate volley."},
+      {level: 10, id: "field_mend", name: "Field Mend", icon: "🌿", cost: 5, healPct: 0.28, text: "Recover 28% of maximum HP."},
+      {level: 15, id: "perfect_shot", name: "Perfect Shot", icon: "🏹", cost: 7, kind: "physical", multiplier: 2.65, armorPierce: 0.65, text: "A master shot that largely ignores armor."}
+    ]
+  },
+  guardian: {
+    passive: {level: 1, name: "Protector", text: "Defending reduces damage even further.", guardMultiplier: 0.35},
+    skills: [
+      {level: 1, id: "shield_bash", name: "Shield Bash", icon: "🛡️", cost: 3, kind: "physical", multiplier: 1.55, guardNext: true, text: "Attack and brace for the next hit."},
+      {level: 5, id: "kind_mend", name: "Kind Mend", icon: "💚", cost: 4, healPct: 0.34, kindnessHeal: true, text: "Heal yourself; Kindness improves the effect."},
+      {level: 10, id: "bulwark", name: "Bulwark", icon: "🏰", cost: 5, guardTurns: 2, text: "Greatly reduce damage for 2 turns."},
+      {level: 15, id: "guardian_smite", name: "Guardian Smite", icon: "🌟", cost: 7, kind: "physical", multiplier: 2.35, guardNext: true, text: "Heavy damage while protecting yourself."}
+    ]
+  },
+  royal: {
+    passive: {level: 1, name: "Fortune's Favor", text: "+10% Gold and better loot rolls.", goldMultiplier: 1.10, lootBonus: 0.10},
+    skills: [
+      {level: 1, id: "radiant_burst", name: "Radiant Burst", icon: "👑", cost: 3, kind: "magic", multiplier: 1.75, text: "A bright magical attack."},
+      {level: 5, id: "rally", name: "Rally", icon: "📣", cost: 4, healPct: 0.18, spRestore: 2, text: "Recover HP and 2 SP."},
+      {level: 10, id: "fortune_strike", name: "Fortune Strike", icon: "💎", cost: 5, kind: "magic", multiplier: 2.1, critBonus: 0.20, text: "A high-critical magical strike."},
+      {level: 15, id: "royal_decree", name: "Royal Decree", icon: "✨", cost: 7, kind: "magic", multiplier: 2.6, healPct: 0.12, text: "Heavy damage and a small heal."}
+    ]
+  }
 };
 
-const LOCAL_BATTLE_SKILLS = {
-  warrior: {name: "Power Strike", cost: 3, kind: "physical", multiplier: 1.8},
-  rogue: {name: "Flurry", cost: 3, kind: "physical", multiplier: 1.65},
-  mage: {name: "Arc Bolt", cost: 3, kind: "magic", multiplier: 1.85},
-  ranger: {name: "Piercing Shot", cost: 3, kind: "physical", multiplier: 1.75},
-  guardian: {name: "Shield Bash", cost: 3, kind: "physical", multiplier: 1.55},
-  royal: {name: "Radiant Burst", cost: 3, kind: "magic", multiplier: 1.75}
+function classCombatProgression(classId) {
+  return CLASS_COMBAT_PROGRESSION[classId] || CLASS_COMBAT_PROGRESSION.warrior;
+}
+
+function unlockedCombatSkills(kid) {
+  const level = Math.max(1, Number(kid.level || 1));
+  return classCombatProgression(kid.classId).skills.filter(skill => level >= skill.level);
+}
+
+function companionBattleEffects(kid) {
+  return (Array.isArray(kid.activeCompanions) ? kid.activeCompanions : []).slice(0, 2).map(companion => {
+    const raw = String(companion.effectId || companion.abilityId || companion.abilityName || companion.ability || "").toLowerCase();
+    let effect = raw;
+    if (raw.includes("double")) effect = "double_cast";
+    else if (raw.includes("shield") || raw.includes("break")) effect = "shield_breaker";
+    else if (raw.includes("guard")) effect = "guard";
+    else if (raw.includes("second") || raw.includes("wind") || raw.includes("heal")) effect = "second_wind";
+    else if (raw.includes("treasure") || raw.includes("loot")) effect = "treasure_nose";
+    return {
+      name: companion.name || "Companion",
+      icon: companion.icon || "🐾",
+      effect
+    };
+  });
+}
+
+const LOCAL_BATTLE_ADVENTURES = {
+  forest: {
+    energy: 5, sleep: 1, xp: 15, gold: 10, dropChance: 0.32,
+    rarityWeights: {poor: 30, common: 55, good: 14, rare: 1},
+    enemies: [
+      {name: "Moss Slime", icon: "🟢", hp: 24, attack: 5, physicalDefense: 2, magicDefense: 0, weakness: "magic", trait: "Soft Body"},
+      {name: "Trail Goblin", icon: "👺", hp: 30, attack: 6, physicalDefense: 2, magicDefense: 2, dodge: 0.05, trait: "Nimble"},
+      {name: "Bramble Boar", icon: "🐗", hp: 36, attack: 7, physicalDefense: 3, magicDefense: 1, weakness: "magic", trait: "Charging"}
+    ]
+  },
+  ruins: {
+    energy: 8, sleep: 2, xp: 28, gold: 20, dropChance: 0.48,
+    rarityWeights: {poor: 10, common: 48, good: 34, rare: 7, legendary: 1},
+    enemies: [
+      {name: "Ruins Skeleton", icon: "💀", hp: 40, attack: 8, physicalDefense: 4, magicDefense: 2, weakness: "magic", trait: "Brittle Armor"},
+      {name: "Stone Beetle", icon: "🪲", hp: 48, attack: 7, physicalDefense: 7, magicDefense: 1, weakness: "magic", trait: "Armored"},
+      {name: "Dust Bandit", icon: "🥷", hp: 43, attack: 9, physicalDefense: 3, magicDefense: 3, dodge: 0.08, trait: "Evasive"}
+    ]
+  },
+  vault: {
+    energy: 12, sleep: 3, xp: 45, gold: 35, dropChance: 0.68,
+    rarityWeights: {common: 25, good: 42, rare: 25, legendary: 7, mythic: 1},
+    enemies: [
+      {name: "Arcane Wisp", icon: "🔵", hp: 58, attack: 10, physicalDefense: 2, magicDefense: 7, weakness: "physical", trait: "Magic Ward"},
+      {name: "Vault Sentinel", icon: "🗿", hp: 72, attack: 11, physicalDefense: 8, magicDefense: 4, weakness: "magic", trait: "Heavy Armor"},
+      {name: "Crystal Drake", icon: "🐉", hp: 82, attack: 12, physicalDefense: 6, magicDefense: 6, dodge: 0.03, trait: "Elite"}
+    ]
+  }
 };
+
+function weightedBattleRarity(weights, luckBonus = 0) {
+  const adjusted = {...weights};
+  if (luckBonus > 0) {
+    adjusted.rare = Number(adjusted.rare || 0) + luckBonus * 30;
+    adjusted.legendary = Number(adjusted.legendary || 0) + luckBonus * 12;
+    adjusted.mythic = Number(adjusted.mythic || 0) + luckBonus * 3;
+  }
+  const entries = Object.entries(adjusted).filter(([, value]) => Number(value) > 0);
+  const total = entries.reduce((sum, [, value]) => sum + Number(value), 0);
+  let roll = Math.random() * total;
+  for (const [rarity, value] of entries) {
+    roll -= Number(value);
+    if (roll <= 0) return rarity;
+  }
+  return "common";
+}
+
+function rollBattleDrop(kid, adventureId, companionEffects = []) {
+  const adventure = LOCAL_BATTLE_ADVENTURES[adventureId] || LOCAL_BATTLE_ADVENTURES.forest;
+  const luck = Number(getClassStats(kid).luck || 0);
+  const hasTreasureCompanion = companionEffects.some(effect => effect.effect === "treasure_nose");
+  const chance = Math.min(0.90, adventure.dropChance + luck * 0.004 + (hasTreasureCompanion ? 0.18 : 0));
+  if (Math.random() > chance) return null;
+  const rarity = weightedBattleRarity(adventure.rarityWeights, luck * 0.002 + (hasTreasureCompanion ? 0.08 : 0));
+  const itemTypes = Object.keys(ITEM_TYPES);
+  return createItem(itemTypes[Math.floor(Math.random() * itemTypes.length)], rarity);
+}
 
 async function startLocalBattle(kidId, adventureId) {
   const adventure = LOCAL_BATTLE_ADVENTURES[adventureId];
@@ -2245,7 +2362,7 @@ async function startLocalBattle(kidId, adventureId) {
 
   const kidSnap = await getDoc(doc(db, "kids", kidId));
   if (!kidSnap.exists()) throw new Error("Adventurer not found.");
-  const kid = { kidId, ...kidSnap.data() };
+  const kid = {kidId, ...kidSnap.data()};
   const energy = Math.min(MAX_ENERGY, Number(kid.energy ?? MAX_ENERGY));
   const sleepiness = currentSleepiness(kid);
 
@@ -2254,16 +2371,21 @@ async function startLocalBattle(kidId, adventureId) {
 
   const stats = getClassStats(kid);
   const level = Math.max(1, Number(kid.level || 1));
-  const maxHp = 30 + level * 3 + Math.round(Number(stats.courage || 0) * 3.5);
-  const maxSp = Math.min(30, 5 + Math.floor(level / 2) + Math.floor(Number(stats.wisdom || 0) / 3));
+  const progression = classCombatProgression(kid.classId);
+  const passive = progression.passive || {};
+  const skills = unlockedCombatSkills(kid);
+  const companions = companionBattleEffects(kid);
+  const baseHp = 30 + level * 3 + Math.round(Number(stats.courage || 0) * 3.5);
+  const maxHp = Math.round(baseHp * Number(passive.maxHpMultiplier || 1));
+  const maxSp = Math.min(36, 5 + Math.floor(level / 2) + Math.floor(Number(stats.wisdom || 0) / 3) + Number(passive.maxSpBonus || 0));
   const magicBasic = Number(stats.wisdom || 0) > Number(stats.strength || 0);
-  const skill = LOCAL_BATTLE_SKILLS[kid.classId] || LOCAL_BATTLE_SKILLS.warrior;
   const baseEnemy = adventure.enemies[Math.floor(Math.random() * adventure.enemies.length)];
   const enemy = {
     ...baseEnemy,
     maxHp: Math.round(baseEnemy.hp + Math.max(0, level - 1) * 5.5),
     attack: Math.round(baseEnemy.attack + Math.max(0, level - 1) * 0.75),
-    defense: Math.round(baseEnemy.defense + Math.max(0, level - 1) * 0.35)
+    physicalDefense: Math.round(Number(baseEnemy.physicalDefense || 0) + Math.max(0, level - 1) * 0.30),
+    magicDefense: Math.round(Number(baseEnemy.magicDefense || 0) + Math.max(0, level - 1) * 0.30)
   };
 
   await updateDoc(doc(db, "kids", kidId), {
@@ -2273,12 +2395,19 @@ async function startLocalBattle(kidId, adventureId) {
     lastAdventureAt: new Date().toISOString()
   });
 
+  const openingLog = [`${kid.name || kidId} encountered ${enemy.name}!`];
+  companions.forEach(companion => openingLog.push(`${companion.icon} ${companion.name} is ready to help.`));
+
   return {
     local: true,
     adventureId,
     status: "active",
     turn: 1,
     playerStats: stats,
+    classId: kid.classId,
+    passive,
+    companions,
+    companionUsed: {},
     player: {
       name: kid.name || kidId,
       hp: maxHp,
@@ -2287,49 +2416,118 @@ async function startLocalBattle(kidId, adventureId) {
       maxSp,
       basicName: magicBasic ? "Spark" : "Attack",
       basicKind: magicBasic ? "magic" : "physical",
-      skill
+      skills,
+      guardTurns: 0,
+      evasionTurns: 0
     },
     enemy: {
       name: enemy.name,
       icon: enemy.icon,
+      trait: enemy.trait || "",
+      weakness: enemy.weakness || "",
       hp: enemy.maxHp,
       maxHp: enemy.maxHp,
       attack: enemy.attack,
-      defense: enemy.defense
+      physicalDefense: enemy.physicalDefense,
+      magicDefense: enemy.magicDefense,
+      dodge: Number(enemy.dodge || 0)
     },
-    log: [`${kid.name || kidId} encountered ${enemy.name}!`],
+    log: openingLog,
     rewards: null
   };
 }
 
-async function resolveLocalBattleAction(kidId, battle, action) {
+async function resolveLocalBattleAction(kidId, battle, action, skillId = "") {
   if (battle.status !== "active") return battle;
 
   const stats = battle.playerStats || {};
   const player = {...battle.player};
   const enemy = {...battle.enemy};
   const log = [...(battle.log || [])];
-  const skill = player.skill || LOCAL_BATTLE_SKILLS.warrior;
-  let guarding = false;
+  const companions = Array.isArray(battle.companions) ? battle.companions : [];
+  const companionUsed = {...(battle.companionUsed || {})};
+  let guarding = Number(player.guardTurns || 0) > 0;
+  let selectedSkill = null;
 
   if (action === "defend") {
     guarding = true;
+    player.guardTurns = Math.max(1, Number(player.guardTurns || 0));
     player.sp = Math.min(Number(player.maxSp || 0), Number(player.sp || 0) + 1);
     log.push(`${player.name} defends and recovers 1 SP.`);
   } else {
     const isSkill = action === "skill";
-    if (isSkill && Number(player.sp || 0) < Number(skill.cost || 0)) throw new Error("Not enough SP.");
-    const kind = isSkill ? skill.kind : player.basicKind;
-    const statValue = kind === "magic" ? Number(stats.wisdom || 0) : Number(stats.strength || 0);
-    const multiplier = isSkill ? Number(skill.multiplier || 1.5) : 1;
-    const variance = 0.9 + Math.random() * 0.2;
-    let damage = Math.max(1, Math.round((statValue * multiplier + Number(stats.agility || 0) * 0.15) * variance - Number(enemy.defense || 0)));
-    const critChance = Math.min(0.28, 0.04 + Number(stats.luck || 0) * 0.006);
-    const crit = Math.random() < critChance;
-    if (crit) damage = Math.round(damage * 1.6);
-    enemy.hp = Math.max(0, Number(enemy.hp || 0) - damage);
+    selectedSkill = isSkill
+      ? (player.skills || []).find(skill => skill.id === skillId)
+      : null;
+    if (isSkill && !selectedSkill) throw new Error("That ability is not available.");
+    if (isSkill && Number(player.sp || 0) < Number(selectedSkill.cost || 0)) throw new Error("Not enough SP.");
+
+    const skill = selectedSkill || {};
     if (isSkill) player.sp = Number(player.sp || 0) - Number(skill.cost || 0);
-    log.push(`${player.name} uses ${isSkill ? skill.name : player.basicName} for ${damage} damage${crit ? " — critical hit!" : "!"}`);
+
+    if (Number(skill.spRestore || 0) > 0) {
+      player.sp = Math.min(Number(player.maxSp || 0), player.sp + Number(skill.spRestore || 0));
+      log.push(`${player.name} uses ${skill.name} and restores ${skill.spRestore} SP.`);
+    }
+
+    if (Number(skill.healPct || 0) > 0) {
+      let healPct = Number(skill.healPct || 0);
+      if (skill.kindnessHeal) healPct += Math.min(0.18, Number(stats.kindness || 0) * 0.004);
+      const heal = Math.max(1, Math.round(Number(player.maxHp || 0) * healPct));
+      player.hp = Math.min(Number(player.maxHp || 0), Number(player.hp || 0) + heal);
+      log.push(`${player.name} uses ${skill.name} and recovers ${heal} HP.`);
+    }
+
+    if (Number(skill.guardTurns || 0) > 0) {
+      player.guardTurns = Math.max(Number(player.guardTurns || 0), Number(skill.guardTurns));
+      guarding = true;
+      log.push(`${player.name} is protected for ${skill.guardTurns} turns.`);
+    }
+    if (skill.guardNext) {
+      player.guardTurns = Math.max(Number(player.guardTurns || 0), 1);
+      guarding = true;
+    }
+    if (Number(skill.evasionTurns || 0) > 0) {
+      player.evasionTurns = Math.max(Number(player.evasionTurns || 0), Number(skill.evasionTurns));
+      log.push(`${player.name} becomes harder to hit.`);
+    }
+
+    if (!isSkill || skill.kind) {
+      const kind = isSkill ? skill.kind : player.basicKind;
+      const statValue = kind === "magic" ? Number(stats.wisdom || 0) : Number(stats.strength || 0);
+      const multiplier = isSkill ? Number(skill.multiplier || 1.5) : 1;
+      const rawDefense = kind === "magic" ? Number(enemy.magicDefense || 0) : Number(enemy.physicalDefense || 0);
+      let armorPierce = Number(skill.armorPierce || 0);
+      const breaker = companions.find(companion => companion.effect === "shield_breaker");
+      if (breaker && !companionUsed.shield_breaker && isSkill) {
+        armorPierce = Math.max(armorPierce, 0.60);
+        companionUsed.shield_breaker = true;
+        log.push(`${breaker.icon} ${breaker.name} uses Shield Breaker!`);
+      }
+      const defense = rawDefense * (1 - Math.min(0.9, armorPierce));
+      const weaknessMultiplier = enemy.weakness === kind ? 1.25 : 1;
+      const variance = 0.9 + Math.random() * 0.2;
+      let damage = Math.max(1, Math.round(((statValue * multiplier + Number(stats.agility || 0) * 0.15) * variance - defense) * weaknessMultiplier));
+      const passiveCrit = Number(battle.passive?.critBonus || 0);
+      const critChance = Math.min(0.45, 0.04 + Number(stats.luck || 0) * 0.006 + passiveCrit + Number(skill.critBonus || 0));
+      const crit = Math.random() < critChance;
+      if (crit) damage = Math.round(damage * 1.6);
+      if (Math.random() < Number(enemy.dodge || 0)) {
+        damage = 0;
+        log.push(`${enemy.name} dodges ${player.name}'s attack!`);
+      } else {
+        enemy.hp = Math.max(0, Number(enemy.hp || 0) - damage);
+        log.push(`${player.name} uses ${isSkill ? skill.name : player.basicName} for ${damage} damage${crit ? " — critical hit!" : ""}${weaknessMultiplier > 1 ? " — weakness!" : "!"}`);
+
+        const doubleCaster = companions.find(companion => companion.effect === "double_cast");
+        const doubleChance = Math.min(0.30, 0.12 + Number(stats.kindness || 0) * 0.004);
+        if (doubleCaster && isSkill && kind === "magic" && Math.random() < doubleChance && Number(enemy.hp || 0) > 0) {
+          const echoDamage = Math.max(1, Math.round(damage * 0.65));
+          enemy.hp = Math.max(0, Number(enemy.hp || 0) - echoDamage);
+          log.push(`${doubleCaster.icon} ${doubleCaster.name} echoes the spell for ${echoDamage} damage!`);
+        }
+      }
+    }
   }
 
   let status = "active";
@@ -2339,35 +2537,70 @@ async function resolveLocalBattleAction(kidId, battle, action) {
     status = "won";
     const adventure = LOCAL_BATTLE_ADVENTURES[battle.adventureId] || LOCAL_BATTLE_ADVENTURES.forest;
     const rewardRoll = 0.9 + Math.random() * 0.2;
-    const xp = Math.max(1, Math.round(adventure.xp * rewardRoll));
-    const gold = Math.max(1, Math.round(adventure.gold * rewardRoll));
     const kidSnap = await getDoc(doc(db, "kids", kidId));
-    const kid = kidSnap.data() || {};
+    const kid = {kidId, ...(kidSnap.data() || {})};
+    const oldLevel = Math.max(1, Number(kid.level || 1));
+    const goldMultiplier = Number(battle.passive?.goldMultiplier || 1);
+    const xp = Math.max(1, Math.round(adventure.xp * rewardRoll));
+    const gold = Math.max(1, Math.round(adventure.gold * rewardRoll * goldMultiplier));
     const newXp = Number(kid.xp || 0) + xp;
     const level = Math.floor(newXp / 100) + 1;
+    const drop = rollBattleDrop(kid, battle.adventureId, companions);
+    const inventory = Array.isArray(kid.inventory) ? [...kid.inventory] : [];
+    if (drop) inventory.push(drop);
+
     await updateDoc(doc(db, "kids", kidId), {
       xp: newXp,
       gold: Number(kid.gold || 0) + gold,
-      level
+      level,
+      inventory
     });
-    rewards = {xp, gold, level};
+
+    rewards = {xp, gold, level, levelUp: level > oldLevel, drop};
     log.push(`${enemy.name} is defeated! +${xp} XP, +${gold} Gold.`);
+    if (drop) log.push(`Treasure found: ${displayItemName(drop)}!`);
   } else {
-    const dodgeChance = Math.min(0.25, Number(stats.agility || 0) * 0.006);
+    const passiveDodge = Number(battle.passive?.dodgeBonus || 0);
+    const evasionBonus = Number(player.evasionTurns || 0) > 0 ? 0.18 : 0;
+    const dodgeChance = Math.min(0.42, Number(stats.agility || 0) * 0.006 + passiveDodge + evasionBonus);
+
     if (Math.random() < dodgeChance) {
       log.push(`${player.name} dodges ${enemy.name}'s attack!`);
     } else {
       const courageReduction = Math.floor(Number(stats.courage || 0) * 0.16);
       let enemyDamage = Math.max(1, Math.round(Number(enemy.attack || 1) * (0.9 + Math.random() * 0.2)) - courageReduction);
-      if (guarding) enemyDamage = Math.max(1, Math.ceil(enemyDamage / 2));
+      if (guarding) {
+        const guardMultiplier = Number(battle.passive?.guardMultiplier || 0.5);
+        enemyDamage = Math.max(1, Math.ceil(enemyDamage * guardMultiplier));
+      }
+
+      const guardCompanion = companions.find(companion => companion.effect === "guard");
+      if (guardCompanion && !companionUsed.guard) {
+        enemyDamage = Math.max(1, Math.ceil(enemyDamage / 2));
+        companionUsed.guard = true;
+        log.push(`${guardCompanion.icon} ${guardCompanion.name} jumps in to guard!`);
+      }
+
       player.hp = Math.max(0, Number(player.hp || 0) - enemyDamage);
       log.push(`${enemy.name} hits for ${enemyDamage} damage${guarding ? " through your guard." : "."}`);
     }
+
+    const secondWind = companions.find(companion => companion.effect === "second_wind");
+    if (secondWind && !companionUsed.second_wind && Number(player.hp || 0) > 0 && Number(player.hp || 0) <= Number(player.maxHp || 0) * 0.30) {
+      const heal = Math.max(1, Math.round(Number(player.maxHp || 0) * 0.20));
+      player.hp = Math.min(Number(player.maxHp || 0), Number(player.hp || 0) + heal);
+      companionUsed.second_wind = true;
+      log.push(`${secondWind.icon} ${secondWind.name} uses Second Wind and restores ${heal} HP!`);
+    }
+
     if (Number(player.hp || 0) <= 0) {
       status = "lost";
       log.push(`${player.name} is defeated and returns to the Guild Hall.`);
     }
   }
+
+  if (Number(player.guardTurns || 0) > 0) player.guardTurns -= 1;
+  if (Number(player.evasionTurns || 0) > 0) player.evasionTurns -= 1;
 
   return {
     ...battle,
@@ -2375,7 +2608,8 @@ async function resolveLocalBattleAction(kidId, battle, action) {
     turn: Number(battle.turn || 1) + 1,
     player,
     enemy,
-    log: log.slice(-12),
+    companionUsed,
+    log: log.slice(-14),
     rewards
   };
 }
