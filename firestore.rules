@@ -34,7 +34,14 @@ service cloud.firestore {
             "classPath",
             "classBranch1",
             "classBranch2",
-            "classChosenAt"
+            "classChosenAt",
+            "energy",
+            "sleepiness",
+            "sleepinessDate",
+            "lastAdventureAt",
+            "xp",
+            "gold",
+            "level"
           ]));
     }
 
